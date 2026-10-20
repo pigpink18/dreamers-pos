@@ -17,7 +17,11 @@ export const useSettings = defineStore('settings', () => {
   })
 
   /** Tài khoản nhận chuyển khoản (VietQR) */
-  const payment = useStorage('payment', { bin: '', account: '', holder: '', qrOnReceipt: true })
+  // Mặc định: MB Bank của Yến (BIN 970422). Đổi trong Cài đặt -> Thanh toán.
+  const DEFAULT_PAYMENT = { bin: '970422', account: '0865665603', holder: '', qrOnReceipt: true }
+  const payment = useStorage('payment', { ...DEFAULT_PAYMENT })
+  // Máy đang để trống tài khoản (bản cũ) -> điền tài khoản MB của Yến
+  if (!payment.value.account) Object.assign(payment.value, { bin: DEFAULT_PAYMENT.bin, account: DEFAULT_PAYMENT.account, qrOnReceipt: true })
   /** Hoá đơn điện tử */
   const einvoice = useStorage('einvoice', {
     provider: 'none', // none | sandbox | misa | viettel | vnpt
