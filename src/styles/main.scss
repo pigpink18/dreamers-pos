@@ -1,0 +1,513 @@
+@use 'tokens' as *;
+@use 'themes';
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+// =====================================================================
+//  BASE
+// =====================================================================
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: $font-family;
+  font-size: 14px;
+  line-height: 1.47;
+  letter-spacing: -0.008em;
+  color: $text;
+  background: $bg;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+h1, h2, h3, h4 { margin: 0; font-family: $font-display; font-weight: 600; letter-spacing: -0.02em; }
+a { color: $primary; text-decoration: none; }
+// Nền hoạ tiết Dreamers (chỉ theme sáng; theme Espresso giữ nền tối trơn)
+html:not([data-theme='espresso']) body {
+  background-color: #fffcf9;
+  background-image: url('../assets/image/pos-pattern.svg');
+  background-repeat: repeat;
+  background-position: left top;
+  background-size: 560px auto;
+}
+
+::selection { background: tint($primary, .18); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: $text-muted; }
+.text-2 { color: $text-2; }
+.text-right { text-align: right; }
+.text-success { color: $success; }
+.text-danger { color: $danger; }
+.fw-600 { font-weight: 600; }
+.mt-16 { margin-top: 16px; }
+.flex { display: flex; align-items: center; gap: 8px; }
+.spacer { flex: 1; }
+.only-mobile { display: none !important; }
+@include mobile {
+  .only-mobile { display: revert !important; }
+  .hide-mobile { display: none !important; }
+}
+
+// Thanh cuộn mảnh kiểu macOS
+* { scrollbar-width: thin; scrollbar-color: var(--fill-2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--fill-2); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+// =====================================================================
+//  CARD
+// =====================================================================
+.card {
+  background: $surface;
+  border-radius: $radius-lg;
+  box-shadow: $shadow;
+  &__header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 16px 20px; border-bottom: 1px solid $border;
+    h3 { font-size: 15px; font-weight: 600; }
+  }
+  &__body { padding: 20px; }
+}
+
+// =====================================================================
+//  BUTTONS
+// =====================================================================
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 16px;
+  font: inherit; font-weight: 500; font-size: 14px; letter-spacing: -0.01em;
+  border-radius: 10px; border: 0;
+  cursor: pointer; white-space: nowrap; user-select: none; -webkit-user-select: none;
+  transition: background-color .2s $ease, box-shadow .2s $ease, transform .15s $ease, opacity .2s;
+  &:active:not(:disabled) { transform: scale(.97); }
+  &:disabled { opacity: .4; cursor: not-allowed; }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 4px tint($primary, .25); }
+
+  &--primary { background: $primary; color: $on-primary; &:hover:not(:disabled) { background: $primary-hover; } }
+  &--ghost {
+    background: $surface; color: $text; box-shadow: 0 0 0 .5px $border-strong, $shadow-sm;
+    &:hover:not(:disabled) { background: $surface-2; }
+  }
+  &--plain { background: transparent; color: $primary; padding: 0 10px; &:hover:not(:disabled) { background: $fill; } }
+  &--soft { background: $primary-soft; color: $primary; &:hover:not(:disabled) { background: tint($primary, .14); } }
+  &--danger { background: $danger-soft; color: $danger; &:hover:not(:disabled) { background: rgba(255, 59, 48, .16); } }
+  &--success { background: $text; color: $surface; &:hover:not(:disabled) { opacity: .88; } }
+  &--sm { height: 30px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+  &--lg { height: 50px; padding: 0 22px; font-size: 16px; font-weight: 600; border-radius: 14px; }
+  &--icon { width: 36px; padding: 0; &.btn--sm { width: 30px; } }
+  &--block { width: 100%; }
+}
+
+// =====================================================================
+//  FORM
+// =====================================================================
+.field {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  label { font-size: 13px; font-weight: 500; color: $text-2; }
+}
+.input, .select, .textarea {
+  width: 100%; height: 38px; padding: 0 12px;
+  font: inherit; font-size: 14px; color: $text;
+  background: $surface; border: 0; border-radius: 10px;
+  box-shadow: inset 0 0 0 1px $border-strong;
+  transition: box-shadow .2s $ease;
+  &:hover { box-shadow: inset 0 0 0 1px var(--text-muted); }
+  &:focus { outline: none; box-shadow: inset 0 0 0 1px $primary, 0 0 0 4px tint($primary, .16); }
+  &::placeholder { color: $text-muted; }
+  &:disabled { background: $fill; color: $text-muted; }
+}
+.textarea { height: auto; padding: 10px 12px; resize: vertical; }
+input[type='checkbox'] { accent-color: $primary; width: 16px; height: 16px; }
+input[type='number'] { -moz-appearance: textfield; }
+input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.form-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  .full { grid-column: 1 / -1; }
+  @include mobile { grid-template-columns: 1fr; }
+}
+.search {
+  position: relative;
+  .input { padding-left: 34px; background: $fill; box-shadow: none; &:focus { background: $surface; box-shadow: inset 0 0 0 1px $primary, 0 0 0 4px tint($primary, .16); } }
+  &::before {
+    content: ''; position: absolute; left: 11px; top: 50%; width: 15px; height: 15px; transform: translateY(-50%); z-index: 1;
+    background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  }
+}
+
+// =====================================================================
+//  DATEPICKER (@vuepic/vue-datepicker) — giao diện lịch kiểu iOS
+// =====================================================================
+.dp--theme-light {
+  --dp-font-family: #{$font-family};
+  --dp-font-size: 14px;
+  --dp-background-color: #{$surface};
+  --dp-text-color: #{$text};
+  --dp-hover-color: #{$fill};
+  --dp-hover-text-color: #{$text};
+  --dp-primary-color: #{$primary};
+  --dp-primary-text-color: #{$on-primary};
+  --dp-secondary-color: #c7c7cc;
+  --dp-border-color: transparent;
+  --dp-menu-border-color: transparent;
+  --dp-border-color-hover: transparent;
+  --dp-border-color-focus: transparent;
+  --dp-icon-color: #{$text-muted};
+  --dp-highlight-color: #{tint($primary, .1)};
+  --dp-range-between-dates-background-color: #{tint($primary, .1)};
+  --dp-range-between-dates-text-color: #{$primary};
+  --dp-border-radius: 10px;
+  --dp-cell-border-radius: 50%;
+  --dp-cell-size: 36px;
+  --dp-menu-padding: 10px;
+  --dp-menu-min-width: 290px;
+  --dp-month-year-row-height: 40px;
+  --dp-action-buttons-padding: 6px 14px;
+  --dp-action-button-height: 32px;
+  --dp-input-padding: 0 34px 0 36px;
+}
+.dp--main { font-family: $font-family; }
+.dp--input {
+  height: 38px; font-size: 14px; font-weight: 500;
+  box-shadow: inset 0 0 0 1px $border-strong; transition: box-shadow .2s $ease;
+  &:hover { box-shadow: inset 0 0 0 1px var(--text-muted); }
+}
+.dp--input-focus { box-shadow: inset 0 0 0 1px $primary, 0 0 0 4px tint($primary, .16) !important; }
+.dp--input-icon { left: 4px; color: $primary; }
+.dp--menu {
+  border-radius: 16px !important; box-shadow: $shadow-lg; border: 0 !important;
+  animation: dpPop .25s $ease-out;
+}
+.dp--arrow-top, .dp--arrow-bottom { display: none; }
+.dp--month-year-select { font-weight: 600; font-size: 15px; }
+.dp--calendar-header-item { font-size: 12px; font-weight: 600; color: $text-muted; }
+.dp--calendar-header-separator { display: none; }
+.dp--cell-inner { font-weight: 500; transition: background .15s, color .15s; }
+.dp--today { border: 0; color: $primary; font-weight: 700; }
+.dp--active { font-weight: 600; box-shadow: 0 2px 8px tint($primary, .35); }
+.dp--overlay-cell-active, .dp--overlay-cell { border-radius: 10px; }
+.dp--action-row { border-top: 1px solid $border; }
+.dp--action-button { border-radius: 8px; font-weight: 600; }
+.dp--action-select { background: $primary; }
+.dp--action-cancel { border: 0; background: $fill; }
+@keyframes dpPop { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+
+// =====================================================================
+//  SELECT (vue-multiselect) — dropdown có tìm kiếm, giống Select2
+// =====================================================================
+.multiselect {
+  min-height: 38px; font-size: 14px; color: $text;
+  &__tags {
+    min-height: 38px; padding: 8px 36px 0 12px; border: 0; border-radius: 10px; background: $surface;
+    box-shadow: inset 0 0 0 1px $border-strong; transition: box-shadow .2s $ease;
+  }
+  &:hover &__tags { box-shadow: inset 0 0 0 1px var(--text-muted); }
+  &--active &__tags { box-shadow: inset 0 0 0 1px $primary, 0 0 0 4px tint($primary, .16); }
+  &--active { z-index: 60; }
+  &__single, &__input, &__placeholder {
+    font-size: 14px; margin-bottom: 8px; padding: 0; min-height: 20px; line-height: 20px; background: transparent;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  &__single { font-weight: 500; }
+  &__placeholder { color: $text-muted; padding-top: 0; }
+  &__input::placeholder { color: $text-muted; }
+  &__select {
+    height: 38px; width: 34px;
+    &::before {
+      border: 0; top: 50%; margin-top: -7px; width: 14px; height: 14px; left: 10px;
+      background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 9 5-5 5 5M7 15l5 5 5-5'/%3E%3C/svg%3E");
+    }
+  }
+  &--active &__select { transform: none; }
+  &__content-wrapper {
+    margin-top: 6px; border: 0 !important; border-radius: 14px !important; background: var(--menu-bg);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: $shadow-lg; padding: 5px; animation: dpPop .2s $ease-out;
+  }
+  &--above &__content-wrapper { margin: 0 0 6px; }
+  &__option {
+    min-height: 36px; padding: 8px 32px 8px 10px; border-radius: 8px; line-height: 20px; font-size: 14px;
+    white-space: normal;
+    &::after { display: none; }
+    &--highlight { background: $primary; color: $on-primary; .muted { color: inherit; opacity: .8; } }
+    &--selected { background: transparent; color: $primary; font-weight: 600; position: relative;
+      &::before { content: '\2713'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-weight: 700; }
+    }
+    &--selected.multiselect__option--highlight { background: $primary; color: $on-primary; }
+  }
+  &--disabled { opacity: .55; background: transparent; }
+  &--disabled .multiselect__current, &--disabled .multiselect__select { background: transparent; }
+}
+
+// =====================================================================
+//  TABLE (trên điện thoại tự chuyển thành danh sách thẻ)
+// =====================================================================
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table {
+  width: 100%; border-collapse: collapse;
+  th {
+    text-align: left; font-size: 12px; font-weight: 500; color: $text-muted;
+    padding: 10px 16px; border-bottom: 1px solid $border; white-space: nowrap;
+  }
+  td { padding: 13px 16px; border-bottom: 1px solid $border; vertical-align: middle; }
+  th:first-child, td:first-child { padding-left: 20px; }
+  th:last-child, td:last-child { padding-right: 20px; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: $surface-2; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tr.clickable { cursor: pointer; }
+  tfoot td { font-weight: 600; background: $surface-2; border-top: 1px solid $border; border-bottom: 0; }
+}
+@include mobile {
+  .table--cards {
+    thead, tfoot { display: none; }
+    tbody, tr, td { display: block; }
+    tbody tr {
+      display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; align-items: center;
+      padding: 12px 16px; border-bottom: 1px solid $border;
+      &:active { background: $fill; }
+    }
+    tbody tr:last-child { border-bottom: 0; }
+    td { padding: 0 !important; border: 0; text-align: left !important; }
+    td.c-title { grid-column: 1; font-weight: 600; }
+    td.c-end { grid-column: 2; grid-row: 1; text-align: right !important; }
+    td.c-sub { grid-column: 1 / -1; font-size: 13px; color: $text-2; }
+    td.c-hide { display: none; }
+    td.c-l2 { grid-column: 1; grid-row: 2; }
+    td.c-r2 { grid-column: 2; grid-row: 2; justify-self: end; }
+    td.empty { grid-column: 1 / -1; }
+  }
+}
+
+// =====================================================================
+//  BADGE / CHIP / SEGMENTED
+// =====================================================================
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+  background: $fill; color: $text-2;
+  &::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  &--success { background: $success-soft; color: $success; }
+  &--warning { background: $warning-soft; color: $warning; }
+  &--danger { background: $danger-soft; color: $danger; }
+  &--info { background: $info-soft; color: $info; }
+  &--plain::before { display: none; }
+}
+.segmented {
+  display: inline-flex; padding: 2px; gap: 0; background: $fill; border-radius: 9px; max-width: 100%; overflow-x: auto;
+  button {
+    flex-shrink: 0; height: 28px; padding: 0 14px; border: 0; background: transparent; border-radius: 7px;
+    font: inherit; font-size: 13px; font-weight: 500; color: $text; cursor: pointer;
+    transition: background .2s $ease, box-shadow .2s $ease;
+    &.active { background: $surface; box-shadow: $shadow-sm, 0 0 0 .5px $border; font-weight: 600; }
+  }
+}
+.chip {
+  flex-shrink: 0; height: 32px; padding: 0 14px; border-radius: 999px; border: 0;
+  background: $surface; box-shadow: inset 0 0 0 1px $border-strong;
+  font: inherit; font-size: 13px; font-weight: 500; color: $text; cursor: pointer;
+  transition: background .2s $ease, color .2s, box-shadow .2s;
+  &:hover { background: $surface-2; }
+  &.active { background: $text; color: $surface; box-shadow: none; }
+}
+
+// =====================================================================
+//  PAGE
+// =====================================================================
+.page { padding: 8px 32px 48px; max-width: 1440px; }
+.page-header {
+  display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin: 4px 0 22px;
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; }
+  p { margin: 3px 0 0; color: $text-muted; font-size: 14px; }
+}
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 14px 20px; border-bottom: 1px solid $border; }
+.grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.empty { padding: 48px 16px; text-align: center; color: $text-muted; }
+
+@include mobile {
+  .page { padding: 4px 16px 28px; }
+  .page-header {
+    align-items: center; margin-bottom: 16px;
+    > div:first-child { width: 100%; }
+    h1 { font-size: 30px; }
+    .btn { flex: 1; }
+  }
+  .grid-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .toolbar { padding: 12px 14px; > * { flex: 1 1 140px; min-width: 0; } }
+  .card { border-radius: 16px; }
+  .card__header { padding: 14px 16px; }
+  .card__body { padding: 16px; }
+}
+
+// =====================================================================
+//  MODAL — trên điện thoại là bottom sheet kiểu iOS
+// =====================================================================
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, .28);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 7vh 16px; overflow-y: auto;
+  animation: fade .2s $ease;
+}
+.modal-backdrop--top { z-index: 150; }
+.modal {
+  width: 100%; background: $surface; border-radius: 20px; box-shadow: $shadow-lg;
+  animation: pop .32s $ease-out;
+  &__header { display: flex; align-items: center; gap: 10px; padding: 18px 22px 14px; border-bottom: 1px solid $border; h3 { font-size: 17px; } }
+  &__close { margin-left: auto; border-radius: 50% !important; width: 28px !important; height: 28px !important; background: $fill !important; box-shadow: none !important; color: $text-2; }
+  &__body { padding: 20px 22px; }
+  &__footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid $border; }
+}
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+@keyframes sheetUp { from { transform: translateY(100%); } }
+
+@include mobile {
+  .modal-backdrop { align-items: flex-end; padding: 0; overflow: hidden; }
+  .modal {
+    max-width: none !important; max-height: calc(100dvh - var(--safe-top) - 24px);
+    display: flex; flex-direction: column;
+    border-radius: 16px 16px 0 0; animation: sheetUp .38s $ease-out;
+    &__header {
+      position: relative; padding-top: 22px; flex-shrink: 0;
+      &::before { content: ''; position: absolute; top: 7px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: rgba(0, 0, 0, .15); }
+    }
+    &__body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
+    &__footer { flex-shrink: 0; padding: 12px 16px calc(12px + var(--safe-bottom)); .btn { flex: 1; } .spacer { display: none; } }
+  }
+}
+
+// =====================================================================
+//  PRINT
+// =====================================================================
+@media print {
+  body { background: #fff; }
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; inset: 0 auto auto 0; width: 80mm; }
+}
+
+// Ô chỉ hiện ở chế độ danh sách thẻ trên điện thoại
+.table td.m-only { display: none; }
+@include mobile { .table--cards td.m-only { display: block; } }
+
+// Phần tử con trong lưới không được tràn (biểu đồ, bảng)
+.dash-grid > *, .report-grid > *, .rooms-layout > *, .grid-stats > * { min-width: 0; }
+
+// =====================================================================
+//  PHIẾU IN K80 (hoá đơn, phiếu chốt ca) — luôn nền trắng chữ đen
+// =====================================================================
+.receipt {
+  font-family: 'Be Vietnam Pro', sans-serif; font-size: 12px; color: #000; background: #fff;
+  width: 300px; margin: 0 auto; padding: 16px; border: 1px dashed #d4d4d8; border-radius: 8px; position: relative;
+  &__shop { text-align: center; line-height: 1.5; strong { font-size: 15px; } }
+  &__title { text-align: center; font-weight: 700; font-size: 14px; margin: 12px 0 8px; letter-spacing: .04em; }
+  &__meta { line-height: 1.7; span { color: #555; display: inline-block; width: 48px; } }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  th { text-align: left; border-top: 1px dashed #999; border-bottom: 1px dashed #999; padding: 4px 0; font-size: 11px; }
+  td { padding: 4px 0; vertical-align: top; }
+  .r { text-align: right; }
+  .sub { color: #666; font-size: 11px; }
+  &__sum {
+    border-top: 1px dashed #999; padding-top: 6px; line-height: 1.9;
+    div { display: flex; justify-content: space-between; }
+    .grand { font-size: 15px; font-weight: 700; }
+  }
+  &__void { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg); font-size: 34px; font-weight: 800; color: rgba(220, 38, 38, .35); border: 4px solid rgba(220, 38, 38, .35); padding: 2px 14px; border-radius: 8px; }
+  &__foot { text-align: center; margin-top: 12px; font-style: italic; color: #444; }
+}
+@media print { .receipt { border: 0; width: 100%; padding: 0; } }
+
+
+// =====================================================================
+//  HIỆU ỨNG CHUYỂN ĐỘNG
+//  data-motion="full" | "reduced" | "off" (Cài đặt › Giao diện › Hiệu ứng)
+// =====================================================================
+
+// ---- Gợn sóng khi bấm ----
+.ripple {
+  position: absolute; border-radius: 50%; pointer-events: none; z-index: 0;
+  background: currentColor; opacity: .14; transform: scale(0);
+  animation: ripple .55s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+.btn--primary .ripple, .btn--success .ripple, .cartbar .ripple, .dropdown__item:hover .ripple { background: #fff; opacity: .28; }
+@keyframes ripple { to { transform: scale(1); opacity: 0; } }
+
+// ---- Chấm bay vào giỏ ----
+.fly-dot { position: fixed; z-index: 300; border-radius: 50%; pointer-events: none; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+
+// ---- Chuyển trang: tiến = trượt từ phải, lùi = trượt từ trái (như iOS), cùng cấp = mờ + nổi lên ----
+.page-fwd-enter-active, .page-back-enter-active, .page-fade-enter-active { transition: opacity .32s $ease-out, transform .38s $ease-out, filter .32s $ease-out; }
+.page-fwd-leave-active, .page-back-leave-active, .page-fade-leave-active { transition: opacity .14s ease-in, transform .14s ease-in; }
+.page-fwd-enter-from { opacity: 0; transform: translateX(28px); }
+.page-fwd-leave-to { opacity: 0; transform: translateX(-12px); }
+.page-back-enter-from { opacity: 0; transform: translateX(-28px); }
+.page-back-leave-to { opacity: 0; transform: translateX(12px); }
+.page-fade-enter-from { opacity: 0; transform: translateY(10px) scale(.995); filter: blur(3px); }
+.page-fade-leave-to { opacity: 0; }
+
+// ---- Xuất hiện lần lượt (stagger) cho thẻ & lưới ----
+.grid-stats > *, .room-grid > *, .pos__grid > .pcard, .dash-grid > *, .user-grid > *, .theme-grid > *,
+.status-filter > *, .report-grid > *, .live__stats > *, .roles > * {
+  animation: rise .5s $ease-out both;
+}
+@for $i from 1 through 16 {
+  .grid-stats > :nth-child(#{$i}), .room-grid > :nth-child(#{$i}), .pos__grid > .pcard:nth-child(#{$i}),
+  .dash-grid > :nth-child(#{$i}), .user-grid > :nth-child(#{$i}), .theme-grid > :nth-child(#{$i}),
+  .status-filter > :nth-child(#{$i}), .report-grid > :nth-child(#{$i}), .live__stats > :nth-child(#{$i}), .roles > :nth-child(#{$i}) {
+    animation-delay: #{($i - 1) * 35ms};
+  }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+
+// Dòng bảng hiện dần
+.table tbody tr { animation: fadeRow .35s $ease-out both; }
+@for $i from 1 through 12 { .table tbody tr:nth-child(#{$i}) { animation-delay: #{($i - 1) * 18ms}; } }
+@keyframes fadeRow { from { opacity: 0; transform: translateY(4px); } }
+
+// Phản hồi nhấn cho thẻ
+.card.clickable, .room, .user-tile, .theme-card, .sf { -webkit-tap-highlight-color: transparent; }
+
+// Badge trạng thái đổi màu mượt
+.badge { transition: background-color .3s, color .3s; }
+
+// ---- Chế độ Nhẹ: chỉ mờ dần, không trượt / nảy / gợn sóng ----
+[data-motion='reduced'] {
+  .page-fwd-enter-from, .page-back-enter-from, .page-fade-enter-from,
+  .page-fwd-leave-to, .page-back-leave-to { transform: none !important; filter: none !important; }
+  .grid-stats > *, .room-grid > *, .pos__grid > .pcard, .dash-grid > *, .user-grid > *, .theme-grid > *,
+  .status-filter > *, .report-grid > *, .live__stats > *, .roles > *, .table tbody tr, .modal, .line, .pcard__qty {
+    animation-name: fadeOnly !important; animation-delay: 0s !important;
+  }
+  .ripple, .fly-dot { display: none; }
+}
+@keyframes fadeOnly { from { opacity: 0; } }
+
+// ---- Tắt hẳn ----
+[data-motion='off'] {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .ripple, .fly-dot { display: none; }
+}
+
+// =====================================================================
+//  TOOLTIP BIỂU ĐỒ (dùng chung: BarChart, TrendChart)
+// =====================================================================
+.chart-tip {
+  position: absolute; pointer-events: none; z-index: 5; min-width: 180px; white-space: nowrap;
+  padding: 10px 12px; border-radius: 12px; font-size: 12px; color: $text;
+  @include vibrancy(var(--menu-bg)); box-shadow: $shadow-lg, 0 0 0 .5px var(--border);
+  &.is-right { transform: translateX(12px); }
+  &.is-left { transform: translateX(calc(-100% - 12px)); }
+  &__title { font-weight: 600; margin-bottom: 6px; }
+  &__row {
+    display: flex; align-items: center; gap: 7px; line-height: 1.85; color: $text-2;
+    i { width: 10px; height: 3px; border-radius: 2px; &.dashed { height: 0; border-top: 2px dashed; } }
+    b { margin-left: auto; padding-left: 14px; font-weight: 600; color: $text; }
+    &.total { border-top: 1px solid $border; margin-top: 4px; padding-top: 4px; color: $text; font-weight: 600; }
+    &.muted { color: $text-muted; }
+  }
+}

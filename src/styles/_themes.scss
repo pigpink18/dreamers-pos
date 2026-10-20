@@ -1,0 +1,98 @@
+// =====================================================================
+//  THEMES — mỗi theme là một bộ CSS variables.
+//  Thêm theme mới: copy 1 khối, đổi tên data-theme, sửa màu, rồi khai báo
+//  trong src/stores/appearance.js (THEMES).
+// =====================================================================
+
+// ---------- Latte (mặc định): nền kem, nâu cà phê ----------
+:root, [data-theme='latte'] {
+  color-scheme: light;
+  --primary: #7b4a26;          // nâu cà phê rang
+  --primary-hover: #673c1d;
+  --primary-soft: #f3e7dc;
+  --on-primary: #ffffff;
+  --bg: #f6f1eb;               // kem sữa
+  --surface: #fffdfa;
+  --surface-2: #fbf7f2;
+  --sidebar-bg: rgba(241, 233, 223, .85);
+  --topbar-bg: rgba(246, 241, 235, .82);
+  --menu-bg: rgba(255, 253, 250, .97);
+  --border: rgba(74, 44, 20, .1);
+  --border-strong: rgba(74, 44, 20, .18);
+  --fill: rgba(123, 74, 38, .07);
+  --fill-2: rgba(123, 74, 38, .13);
+  --text: #2b1d14;             // espresso
+  --text-2: #5c4a3d;
+  --text-muted: #94826f;
+  --success: #2f7d45; --success-soft: rgba(47, 125, 69, .12);
+  --warning: #b45309; --warning-soft: rgba(217, 119, 6, .13);
+  --danger: #c0352b;  --danger-soft: rgba(192, 53, 43, .1);
+  --info: #2f6db3;    --info-soft: rgba(47, 109, 179, .1);
+  --chart-1: #a35a25;          // bán hàng (đã kiểm tra mù màu)
+  --chart-2: #4a7fb5;          // tiền phòng (xanh dịu, đã kiểm tra mù màu)
+  --shadow-sm: 0 1px 2px rgba(60, 35, 15, .06);
+  --shadow: 0 1px 2px rgba(60, 35, 15, .05), 0 8px 24px rgba(60, 35, 15, .06);
+  --shadow-lg: 0 24px 64px rgba(60, 35, 15, .18), 0 4px 16px rgba(60, 35, 15, .08);
+}
+
+// ---------- Espresso: tối, sang, chữ màu kem ----------
+[data-theme='espresso'] {
+  color-scheme: dark;
+  --primary: #d6a26f;          // caramel
+  --primary-hover: #e2b483;
+  --primary-soft: rgba(214, 162, 111, .14);
+  --on-primary: #24170e;
+  --bg: #15100c;
+  --surface: #211912;
+  --surface-2: #1b140f;
+  --sidebar-bg: rgba(28, 21, 16, .88);
+  --topbar-bg: rgba(21, 16, 12, .82);
+  --menu-bg: rgba(38, 29, 22, .97);
+  --border: rgba(255, 236, 214, .08);
+  --border-strong: rgba(255, 236, 214, .16);
+  --fill: rgba(255, 236, 214, .06);
+  --fill-2: rgba(255, 236, 214, .11);
+  --text: #f4e9dd;
+  --text-2: #cdbca9;
+  --text-muted: #8f7d6b;
+  --success: #6cc387; --success-soft: rgba(108, 195, 135, .14);
+  --warning: #f0a54a; --warning-soft: rgba(240, 165, 74, .15);
+  --danger: #ef7b6f;  --danger-soft: rgba(239, 123, 111, .14);
+  --info: #7fb0ec;    --info-soft: rgba(127, 176, 236, .14);
+  --chart-1: #b87a48;
+  --chart-2: #5f93d0;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, .6), 0 4px 16px rgba(0, 0, 0, .35);
+}
+
+// ---------- Classic: xám Apple + indigo (giao diện trước đây) ----------
+[data-theme='classic'] {
+  color-scheme: light;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-soft: #eef0ff;
+  --on-primary: #ffffff;
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #fafafc;
+  --sidebar-bg: rgba(242, 242, 245, .82);
+  --topbar-bg: rgba(245, 245, 247, .8);
+  --menu-bg: rgba(255, 255, 255, .97);
+  --border: rgba(0, 0, 0, .08);
+  --border-strong: rgba(0, 0, 0, .14);
+  --fill: rgba(118, 118, 128, .08);
+  --fill-2: rgba(118, 118, 128, .14);
+  --text: #1d1d1f;
+  --text-2: #515154;
+  --text-muted: #86868b;
+  --success: #248a3d; --success-soft: rgba(52, 199, 89, .14);
+  --warning: #c93400; --warning-soft: rgba(255, 149, 0, .14);
+  --danger: #d70015;  --danger-soft: rgba(255, 59, 48, .1);
+  --info: #0066cc;    --info-soft: rgba(0, 122, 255, .1);
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .05);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 6px 20px rgba(0, 0, 0, .05);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, .16), 0 4px 16px rgba(0, 0, 0, .06);
+}

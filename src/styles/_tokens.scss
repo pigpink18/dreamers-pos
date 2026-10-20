@@ -1,0 +1,72 @@
+// ===================================================================
+//  DESIGN TOKENS — phong cách Apple (macOS / iOS), giao diện sáng
+//  Đổi màu nhấn, font, bo góc của toàn app tại đây
+// ===================================================================
+$font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+$font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+
+// Màu lấy từ CSS variables để đổi theme lúc đang chạy (xem _themes.scss)
+$primary: var(--primary);
+$primary-hover: var(--primary-hover);
+$primary-soft: var(--primary-soft);
+$on-primary: var(--on-primary);
+
+$bg: var(--bg);
+$surface: var(--surface);
+$surface-2: var(--surface-2);
+$sidebar-bg: var(--sidebar-bg);
+$sidebar-text: var(--text);
+$border: var(--border);
+$border-strong: var(--border-strong);
+$fill: var(--fill);
+$fill-2: var(--fill-2);
+$text: var(--text);
+$text-2: var(--text-2);
+$text-muted: var(--text-muted);
+
+$success: var(--success);
+$success-soft: var(--success-soft);
+$warning: var(--warning);
+$warning-soft: var(--warning-soft);
+$danger: var(--danger);
+$danger-soft: var(--danger-soft);
+$info: var(--info);
+$info-soft: var(--info-soft);
+
+$chart-1: var(--chart-1);
+$chart-2: var(--chart-2);
+
+/** Pha trong suốt cho màu dạng biến CSS: tint($primary, .2) */
+@function tint($c, $a) {
+  @return color-mix(in srgb, #{$c} #{$a * 100%}, transparent);
+}
+
+// Hình khối
+$radius-sm: 8px;
+$radius: 12px;
+$radius-lg: 18px;
+$shadow-sm: var(--shadow-sm);
+$shadow: var(--shadow);
+$shadow-lg: var(--shadow-lg);
+$sidebar-w: 244px;
+$topbar-h: 56px;
+$tabbar-h: 76px; // thanh tab nổi 62px + khoảng hở 14px
+
+// Chuyển động kiểu Apple
+$ease: cubic-bezier(.25, .1, .25, 1);
+$ease-out: cubic-bezier(.22, 1, .36, 1);
+$spring: cubic-bezier(.34, 1.36, .64, 1);
+
+// Điểm ngắt màn hình
+$mobile: 760px;
+$tablet: 1024px;
+
+@mixin mobile { @media (max-width: $mobile) { @content; } }
+@mixin tablet { @media (max-width: $tablet) { @content; } }
+
+/** Lớp kính mờ (vibrancy) của macOS */
+@mixin vibrancy($bg: rgba(255, 255, 255, .72)) {
+  background: $bg;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
