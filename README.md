@@ -80,7 +80,7 @@ App là web tĩnh, nên GitHub tự build và host miễn phí. File `.github/wo
 5. Lần sau sửa code chỉ cần `git add . && git commit -m "..." && git push`.
 
 Khi test:
-- App mới chỉ có 2 tài khoản: **Yến** (chủ quán, PIN `240819`) và **Lam** (nhân viên, PIN `123456`). Chưa có món, phòng hay hoá đơn.
+- App mới chỉ có 2 tài khoản: **Yến** (chủ quán, PIN `240819`) và **Lam** (nhân viên, PIN `123456`). Đã có sẵn menu thật của Dreamers; chưa có phòng, khách hay hoá đơn.
 - Muốn xem thử với số liệu có sẵn: **Cài đặt** → **Dữ liệu** → **Nạp dữ liệu mẫu**.
 - Mỗi người test có dữ liệu riêng trên trình duyệt của mình. Muốn mọi máy dùng chung dữ liệu thì kết nối Supabase (xem `supabase/HUONG-DAN.md`).
 - Đổi `DATA_VERSION` trong `src/main.js` sẽ xoá sạch dữ liệu trên mọi máy ở lần mở tiếp theo.

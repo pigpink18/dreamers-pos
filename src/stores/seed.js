@@ -101,7 +101,7 @@ const PRODUCTS = [
   ['Giặt ủi', 'Dịch vụ', 'Kg', 30000, 5000, '#64748b', false],
   ['Phụ thu người lớn', 'Dịch vụ', 'Người/đêm', 200000, 0, '#64748b', false],
 ]
-export const MENU_VERSION = 3 // tăng số này mỗi khi thêm món vào MENU -> máy đang dùng sẽ tự bổ sung
+export const MENU_VERSION = 4 // tăng số này mỗi khi thêm món vào MENU -> máy đang dùng sẽ tự bổ sung
 
 /** Dữ liệu thật (không phải mẫu): thêm các món trong MENU còn thiếu, chạy 1 lần cho mỗi phiên bản menu */
 export function ensureMenu() {
@@ -135,7 +135,7 @@ export const ROOMS = [
   ['Sương', 'Mist Room', 1, 680000, 2],
 ]
 
-/** App mới hoàn toàn: chỉ có 2 tài khoản Yến (chủ quán) và Lam (nhân viên), chưa có món, phòng hay hoá đơn */
+/** App mới hoàn toàn: 2 tài khoản Yến (chủ quán), Lam (nhân viên) và menu thật; chưa có phòng, khách hay hoá đơn */
 export function seedFresh() {
   withoutAudit(() => {
     const auth = useAuth()
@@ -145,7 +145,7 @@ export function seedFresh() {
   })
   useSettings().ops.demo = false
   markSeeded()
-  localStorage.setItem('dreamers:menuVersion', String(MENU_VERSION)) // không tự thêm menu mẫu
+  ensureMenu() // app mới có sẵn menu thật của Dreamers
 }
 
 /** Nạp toàn bộ dữ liệu mẫu (không ghi nhật ký trong lúc nạp) */

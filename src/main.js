@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { hasData, clearAll } from './utils/storage'
-import { seedDemo, seedFresh } from './stores/seed'
+import { seedDemo, seedFresh, ensureMenu } from './stores/seed'
 import { useAppearance } from './stores/theme'
 import { installRipple } from './utils/motion'
 import './assets/font-awesome-6-pro/css/fontawesome.min.css'
@@ -19,7 +19,7 @@ useAppearance() // áp theme Latte / Espresso / Classic
 
 // ---- Dữ liệu lần đầu ----
 // DATA_VERSION đổi -> mọi máy xoá sạch dữ liệu cũ một lần và bắt đầu như app mới.
-// App mới chỉ có 2 tài khoản Yến / Lam. Muốn xem thử với số liệu mẫu: Cài đặt -> Dữ liệu -> Nạp dữ liệu mẫu.
+// App mới có 2 tài khoản Yến / Lam và menu thật của Dreamers. Muốn xem thử với số liệu mẫu: Cài đặt -> Dữ liệu -> Nạp dữ liệu mẫu.
 const DATA_VERSION = '2'
 const wantDemo = localStorage.getItem('dreamers:wantDemo') === '1'
 if (localStorage.getItem('dreamers:dataVersion') !== DATA_VERSION) {
@@ -28,6 +28,7 @@ if (localStorage.getItem('dreamers:dataVersion') !== DATA_VERSION) {
 }
 if (wantDemo) { clearAll(['appearance', 'dataVersion']); seedDemo() }
 else if (!hasData()) seedFresh()
+else ensureMenu() // bổ sung món còn thiếu trong menu (mỗi phiên bản menu chạy 1 lần, không ghi đè món đã sửa)
 
 // Router cài sau khi có dữ liệu để kiểm tra đăng nhập chính xác
 app.use(router)
