@@ -460,15 +460,21 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 // ---- Chấm bay vào giỏ ----
 .fly-dot { position: fixed; z-index: 300; border-radius: 50%; pointer-events: none; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
 
-// ---- Chuyển trang: tiến = trượt từ phải, lùi = trượt từ trái (như iOS), cùng cấp = mờ + nổi lên ----
-.page-fwd-enter-active, .page-back-enter-active, .page-fade-enter-active { transition: opacity .32s $ease-out, transform .38s $ease-out, filter .32s $ease-out; }
-.page-fwd-leave-active, .page-back-leave-active, .page-fade-leave-active { transition: opacity .14s ease-in, transform .14s ease-in; }
-.page-fwd-enter-from { opacity: 0; transform: translateX(28px); }
-.page-fwd-leave-to { opacity: 0; transform: translateX(-12px); }
-.page-back-enter-from { opacity: 0; transform: translateX(-28px); }
-.page-back-leave-to { opacity: 0; transform: translateX(12px); }
-.page-fade-enter-from { opacity: 0; transform: translateY(10px) scale(.995); filter: blur(3px); }
-.page-fade-leave-to { opacity: 0; }
+// ---- Chuyển trang: trang cũ biến mất ngay, trang mới hiện lên nhẹ (không trượt ngang để màn hình không bị "nhảy") ----
+// Trang cũ không có hiệu ứng rời đi: tránh cảnh trang Bán hàng giãn dài ra trong lúc mờ dần, và chiều cao trang không bị co lại rồi giãn ra
+.page-fwd-leave-active, .page-back-leave-active, .page-fade-leave-active { display: none !important; }
+.page-fwd-enter-active, .page-back-enter-active, .page-fade-enter-active { transition: opacity .24s $ease-out, transform .3s $ease-out; }
+.page-fwd-enter-from { opacity: 0; transform: translateX(14px); }
+.page-back-enter-from { opacity: 0; transform: translateX(-14px); }
+.page-fade-enter-from { opacity: 0; transform: translateY(6px); }
+// Phần nội dung không được tràn ngang (trượt nhẹ khi chuyển trang làm iPhone tưởng màn hình rộng ra -> thanh tab giãn, nháy)
+html, body { overflow-x: clip; }
+.main, .content { overflow-x: clip; }
+@include mobile {
+  // điện thoại: chỉ mờ dần, không trượt
+  .page-fwd-enter-from, .page-back-enter-from, .page-fade-enter-from { transform: none; }
+  .page-fwd-enter-active, .page-back-enter-active, .page-fade-enter-active { transition: opacity .18s $ease-out; }
+}
 
 // ---- Xuất hiện lần lượt (stagger) cho thẻ & lưới ----
 .grid-stats > *, .room-grid > *, .pos__grid > .pcard, .dash-grid > *, .user-grid > *, .theme-grid > *,
@@ -483,6 +489,13 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
   }
 }
 @keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+@include mobile {
+  // điện thoại: thẻ chỉ hiện mờ dần nhanh, không nhô lên từng cái (đỡ cảm giác màn hình nhảy khi chuyển tab)
+  .grid-stats > *, .room-grid > *, .pos__grid > .pcard, .dash-grid > *, .user-grid > *, .theme-grid > *,
+  .status-filter > *, .report-grid > *, .live__stats > *, .roles > *, .table tbody tr {
+    animation: fadeOnly .2s $ease-out both !important; animation-delay: 0s !important;
+  }
+}
 
 // Dòng bảng hiện dần
 .table tbody tr { animation: fadeRow .35s $ease-out both; }
