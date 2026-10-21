@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { hasData, clearAll } from './utils/storage'
-import { seedDemo, seedFresh, ensureMenu, ensureRooms } from './stores/seed'
+import { seedDemo, seedFresh, ensureMenu, ensureRooms, viRoomTypes } from './stores/seed'
 import { useAppearance } from './stores/theme'
 import { installRipple } from './utils/motion'
 import './assets/font-awesome-6-pro/css/fontawesome.min.css'
@@ -28,7 +28,7 @@ if (localStorage.getItem('dreamers:dataVersion') !== DATA_VERSION) {
 }
 if (wantDemo) { clearAll(['appearance', 'dataVersion']); seedDemo() }
 else if (!hasData()) seedFresh()
-else { ensureMenu(); ensureRooms() } // bổ sung món còn thiếu trong menu (mỗi phiên bản menu chạy 1 lần, không ghi đè món đã sửa)
+else { ensureMenu(); ensureRooms(); viRoomTypes() } // bổ sung món còn thiếu trong menu (mỗi phiên bản menu chạy 1 lần, không ghi đè món đã sửa)
 
 // Router cài sau khi có dữ liệu để kiểm tra đăng nhập chính xác
 app.use(router)

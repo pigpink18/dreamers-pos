@@ -124,16 +124,31 @@ const PRICE_FIXES = [['Mì trộn sốt cay Samyang', 60000, 80000]]
 
 const NAMES = ['Nguyễn Minh Anh', 'Trần Quốc Bảo', 'Lê Thu Hà', 'Phạm Gia Huy', 'Võ Ngọc Lan', 'Đặng Hoàng Nam',
   'Bùi Khánh Linh', 'Hồ Đức Thịnh', 'Ngô Phương Thảo', 'Dương Tuấn Kiệt', 'Mai Thanh Trúc', 'Lý Hải Đăng']
-// 7 phòng theo bảng giá Dreamers: [tên, tên tiếng Anh, tầng, giá/đêm, sức chứa]
+// 7 phòng theo bảng giá Dreamers: [tên, tên hiển thị kèm "Room", tầng, giá/đêm, sức chứa]
 export const ROOMS = [
-  ['Mây', 'Cloud Room', 1, 820000, 2],
-  ['Nắng', 'Sunny Room', 1, 820000, 2],
-  ['Gió', 'Wind Room', 1, 820000, 2],
-  ['Thu', 'Autumn Room', 1, 780000, 2],
-  ['Hạ', 'Summer Room', 1, 780000, 2],
-  ['Đông', 'Winter Room', 1, 500000, 2],
-  ['Sương', 'Mist Room', 1, 680000, 2],
+  ['Mây', 'Mây Room', 1, 820000, 2],
+  ['Nắng', 'Nắng Room', 1, 820000, 2],
+  ['Gió', 'Gió Room', 1, 820000, 2],
+  ['Thu', 'Thu Room', 1, 780000, 2],
+  ['Hạ', 'Hạ Room', 1, 780000, 2],
+  ['Đông', 'Đông Room', 1, 500000, 2],
+  ['Sương', 'Sương Room', 1, 680000, 2],
 ]
+// Tên tiếng Anh cũ (bản trước) -> đổi thành đúng tên phòng: Cloud Room -> Mây Room ...
+const OLD_EN_TYPES = { 'Cloud Room': 'Mây Room', 'Sunny Room': 'Nắng Room', 'Wind Room': 'Gió Room', 'Autumn Room': 'Thu Room',
+  'Summer Room': 'Hạ Room', 'Winter Room': 'Đông Room', 'Mist Room': 'Sương Room' }
+
+/** Đổi tên loại phòng tiếng Anh cũ thành "<tên phòng> Room" — chạy 1 lần */
+export function viRoomTypes() {
+  const key = 'dreamers:roomTypeVi'
+  if (localStorage.getItem(key)) return
+  useRooms().rooms.forEach((r) => { if (OLD_EN_TYPES[r.type]) r.type = `${r.name} Room` })
+  // dòng tiền phòng trên hoá đơn cũ: "Phòng Mây (Cloud Room) × 2 đêm" -> "Phòng Mây (Mây Room) × 2 đêm"
+  useInvoices().items.forEach((inv) => inv.items?.forEach((it) => {
+    for (const [en, vi] of Object.entries(OLD_EN_TYPES)) if (it.name?.includes(`(${en})`)) it.name = it.name.replace(`(${en})`, `(${vi})`)
+  }))
+  localStorage.setItem(key, '1')
+}
 
 /** Thêm 7 phòng Dreamers nếu máy chưa có phòng nào (chạy 1 lần, xoá phòng rồi thì không tự thêm lại) */
 export function ensureRooms() {

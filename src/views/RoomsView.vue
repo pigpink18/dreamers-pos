@@ -83,12 +83,12 @@ function clean(r) {
 
 // ---------- Quản lý phòng ----------
 function openRoom(r) {
-  roomForm.value = reactive(r ? { ...r } : { name: '', type: 'Standard', floor: 1, price: 400000, capacity: 2 })
+  roomForm.value = reactive(r ? { ...r } : { name: '', type: '', floor: 1, price: 400000, capacity: 2 })
 }
 function saveRoom() {
   const f = roomForm.value
   if (!f.name.trim()) return ui.toast('Nhập tên/số phòng', 'error')
-  rooms.saveRoom({ ...f, price: +f.price, floor: +f.floor, capacity: +f.capacity })
+  rooms.saveRoom({ ...f, type: (f.type || '').trim() || `${f.name.trim()} Room`, price: +f.price, floor: +f.floor, capacity: +f.capacity })
   ui.toast('Đã lưu phòng')
   roomForm.value = null
 }
@@ -247,7 +247,7 @@ async function deleteRoom(r) {
     <BaseModal v-if="roomForm" :title="roomForm.id ? `Sửa phòng ${roomForm.name}` : 'Thêm phòng'" @close="roomForm = null">
       <form id="rform" class="form-grid" @submit.prevent="saveRoom">
         <div class="field"><label>Số / tên phòng *</label><input class="input" v-model="roomForm.name" autofocus /></div>
-        <div class="field"><label>Loại phòng</label><input class="input" v-model="roomForm.type" /></div>
+        <div class="field"><label>Tên hiển thị</label><input class="input" v-model="roomForm.type" :placeholder="`Để trống = ${roomForm.name || 'Tên phòng'} Room`" /></div>
         <div class="field"><label>Tầng</label><input class="input" type="number" v-model="roomForm.floor" /></div>
         <div class="field"><label>Sức chứa (khách)</label><input class="input" type="number" min="1" v-model="roomForm.capacity" /></div>
         <div class="field full"><label>Giá / đêm</label><MoneyInput v-model="roomForm.price" /></div>

@@ -124,6 +124,7 @@ html:not([data-theme='espresso']) body {
 // iPhone/iPad tự phóng to trang khi chạm vào ô nhập có chữ < 16px và không tự thu lại
 // -> thanh tab, giỏ hàng bị lệch ra ngoài màn hình. Máy cảm ứng: chữ trong ô nhập = 16px.
 @media (hover: none) and (pointer: coarse) {
+  .segmented button { height: 34px; }
   .input, .select, .textarea, input, select, textarea, .multiselect__input, .multiselect__single, .dp__input { font-size: 16px !important; }
 }
 // Khoá cuộn trang phía sau khi đang mở bảng / popup (src/utils/scrollLock.js)
@@ -351,6 +352,9 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
   }
   .grid-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
   .toolbar { padding: 12px 14px; > * { flex: 1 1 140px; min-width: 0; } }
+  // Nhóm nút chọn (Hôm nay / Hôm qua / 7 ngày...): chia đều cả hàng, không bị hở bên phải
+  .segmented button { flex: 1 1 auto; padding: 0 10px; }
+  .toolbar > .segmented { flex-basis: 100%; display: flex; button { flex: 1 1 0; min-width: 0; padding: 0 6px; } }
   .card { border-radius: 16px; }
   .card__header { padding: 14px 16px; }
   .card__body { padding: 16px; }
