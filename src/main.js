@@ -6,12 +6,15 @@ import { hasData, clearAll } from './utils/storage'
 import { seedDemo, seedFresh, ensureMenu, ensureRooms, viRoomTypes } from './stores/seed'
 import { useAppearance } from './stores/theme'
 import { installRipple } from './utils/motion'
+import { installPwaUpdate } from './utils/pwaUpdate'
 import './assets/font-awesome-6-pro/css/fontawesome.min.css'
 import './assets/font-awesome-6-pro/css/light.min.css'
 // CSS thư viện phải nạp TRƯỚC main.scss để giao diện của mình ghi đè được
 import '@vuepic/vue-datepicker/dist/main.css'
 import 'vue-multiselect/dist/vue-multiselect.css'
 import './styles/main.scss'
+
+installPwaUpdate() // có bản mới thì tự cập nhật
 
 const app = createApp(App)
 app.use(createPinia())
