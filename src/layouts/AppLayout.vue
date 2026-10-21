@@ -47,6 +47,24 @@ const tabIndex = computed(() => {
   if (moreOpen.value || inMore.value) return tabRoutes.value.length
   return tabRoutes.value.findIndex((r) => r.name === route.name)
 })
+// Đo đúng vị trí & bề rộng của tab đang chọn để viên kính nằm chính giữa tab (không tính chia đều theo công thức)
+const glassEl = ref(null)
+const lens = ref({ x: 0, w: 0 })
+function measureLens() {
+  const items = glassEl.value?.querySelectorAll('.tabbar__item')
+  const el = items?.[tabIndex.value]
+  if (el) lens.value = { x: el.offsetLeft, w: el.offsetWidth }
+}
+watch([tabIndex, tabCount], () => requestAnimationFrame(measureLens), { flush: 'post' })
+// Đo lại khi thanh tab đổi kích thước (lúc mở app, xoay máy, font tải xong...)
+let lensRO = null
+onMounted(() => {
+  requestAnimationFrame(measureLens)
+  if (window.ResizeObserver && glassEl.value) { lensRO = new ResizeObserver(measureLens); lensRO.observe(glassEl.value) }
+  window.addEventListener('resize', measureLens)
+  document.fonts?.ready?.then(measureLens)
+})
+onBeforeUnmount(() => { lensRO?.disconnect(); window.removeEventListener('resize', measureLens) })
 
 // ---- Hướng chuyển trang: đi tới mục phía sau trong menu = trượt sang trái, quay lại = trượt sang phải ----
 const order = router.options.routes.map((r) => r.name)
@@ -224,8 +242,8 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
 
     <!-- ============ TAB BAR (điện thoại / máy tính bảng) ============ -->
     <nav class="tabbar" aria-label="Điều hướng chính" :style="{ '--n': tabCount, '--i': Math.max(0, tabIndex) }">
-      <div class="tabbar__glass">
-        <span class="tabbar__lens" :class="{ hidden: tabIndex < 0 }" aria-hidden="true"></span>
+      <div ref="glassEl" class="tabbar__glass">
+        <span class="tabbar__lens" :class="{ hidden: tabIndex < 0 || !lens.w }" :style="{ width: lens.w + 'px', transform: `translateX(${lens.x}px)` }" aria-hidden="true"></span>
         <RouterLink v-for="r in tabRoutes" :key="r.name" :to="r.path" class="tabbar__item" active-class="" exact-active-class="active">
           <Icon :name="r.meta.icon" :size="20" />
           <span>{{ r.meta.tab || r.meta.title }}</span>
@@ -480,15 +498,14 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
         0 2px 6px rgba(40, 24, 12, .08);
     }
     &__lens {
-      position: absolute; top: 5px; bottom: 5px; left: 5px; width: calc((100% - 10px) / var(--n)); border-radius: 999px;
-      transform: translateX(calc(var(--i) * 100%));
+      position: absolute; top: 5px; bottom: 5px; left: 0; border-radius: 999px; // vị trí & bề rộng đo bằng JS theo tab đang chọn
       background: color-mix(in srgb, var(--primary) 13%, transparent);
       box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--primary) 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35);
       transition: transform .45s $spring, opacity .2s;
       &.hidden { opacity: 0; }
     }
     &__item {
-      position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      position: relative; flex: 1 1 0; min-width: 0; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
       border: 0; background: transparent; border-radius: 999px; font: inherit; font-size: 10.5px; font-weight: 500; letter-spacing: -.01em;
       color: $text-2; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color .2s;
       span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
