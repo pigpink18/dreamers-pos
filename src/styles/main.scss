@@ -196,6 +196,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .dp--cell-inner { font-weight: 500; transition: background .15s, color .15s; }
 .dp--today { border: 0; color: $primary; font-weight: 700; }
 .dp--active { font-weight: 600; box-shadow: 0 2px 8px tint($primary, .35); }
+// Ngày đang chọn (kể cả khi trùng hôm nay): chữ trắng trên nền nâu, luôn đọc được
+.dp--active, .dp--today.dp--active, .dp--range-start, .dp--range-end { background: $primary !important; color: $on-primary !important; }
+// Hôm nay nhưng chưa chọn: vòng viền nhẹ để dễ nhận ra
+.dp--today:not(.dp--active) { box-shadow: inset 0 0 0 1.5px tint($primary, .35); }
+.dp--cell-disabled { color: var(--text-muted) !important; opacity: .45; }
 .dp--overlay-cell-active, .dp--overlay-cell { border-radius: 10px; }
 .dp--action-row { border-top: 1px solid $border; }
 .dp--action-button { border-radius: 8px; font-weight: 600; }
@@ -521,4 +526,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
     &.total { border-top: 1px solid $border; margin-top: 4px; padding-top: 4px; color: $text; font-weight: 600; }
     &.muted { color: $text-muted; }
   }
+}
+
+// Chữ gợi ý / giá trị dài trong ô chọn: cắt "..." thay vì đẩy tràn ngang (màn hình nhỏ)
+.multiselect { min-width: 0; max-width: 100%; }
+.multiselect__tags { min-width: 0; overflow: hidden; }
+.multiselect__placeholder, .multiselect__single {
+  display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

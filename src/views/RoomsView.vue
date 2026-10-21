@@ -151,7 +151,13 @@ async function deleteRoom(r) {
               </header>
               <div class="room__meta">
                 <span class="badge room__status" :class="`badge--${ROOM_STATUS[cardInfo(r).status].badge}`">{{ ROOM_STATUS[cardInfo(r).status].label }}</span>
-                <div class="room__price num">{{ number(r.price) }}<span> /đêm</span></div>
+                <div v-if="cardInfo(r).staying && rooms.isPackage(cardInfo(r).staying)" class="room__price num room__price--custom" title="Giá riêng của khách đang ở">
+                  {{ number(cardInfo(r).staying.packagePrice) }}<span> trọn gói</span>
+                </div>
+                <div v-else-if="cardInfo(r).staying && rooms.customPrice(cardInfo(r).staying)" class="room__price num room__price--custom" title="Giá riêng của khách đang ở">
+                  {{ number(rooms.rateOf(cardInfo(r).staying)) }}<span> /đêm</span>
+                </div>
+                <div v-else class="room__price num">{{ number(r.price) }}<span> /đêm</span></div>
               </div>
 
               <!-- Đang ở -->
@@ -354,4 +360,5 @@ $st: (vacant: ($success, $success-soft), reserved: ($info, $info-soft), occupied
   .room-grid { grid-template-columns: 1fr; }
   .room__edit { opacity: 1; }
 }
+.room__price--custom { color: var(--warning); }
 </style>

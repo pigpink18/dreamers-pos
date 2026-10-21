@@ -73,6 +73,8 @@ export const useRooms = defineStore('rooms', () => {
     )
   }
 
+  const priceText = (b) => (isPackage(b) ? `trọn gói ${(+b.packagePrice || 0).toLocaleString('vi-VN')} ₫` : `${rateOf(b).toLocaleString('vi-VN')} ₫/đêm`)
+
   function saveBooking(data) {
     if (data.checkOut <= data.checkIn) throw new Error('Ngày trả phòng phải sau ngày nhận phòng')
     const c = findConflict(data)
@@ -80,7 +82,7 @@ export const useRooms = defineStore('rooms', () => {
     if (data.id) {
       const b = bookingById(data.id)
       Object.assign(b, data)
-      useAudit().log('booking.update', `${b.code} · ${b.guestName} · ${roomById(b.roomId)?.name} · ${b.checkIn} → ${b.checkOut}`)
+      useAudit().log('booking.update', `${b.code} · ${b.guestName} · ${roomById(b.roomId)?.name} · ${b.checkIn} → ${b.checkOut} · ${priceText(b)}`)
       return b
     }
     const b = {
@@ -93,7 +95,7 @@ export const useRooms = defineStore('rooms', () => {
       createdAt: new Date().toISOString(),
     }
     bookings.value.push(b)
-    useAudit().log('booking.create', `${b.code} · ${b.guestName} · ${roomById(b.roomId)?.name} · ${b.checkIn} → ${b.checkOut}`)
+    useAudit().log('booking.create', `${b.code} · ${b.guestName} · ${roomById(b.roomId)?.name} · ${b.checkIn} → ${b.checkOut} · ${priceText(b)}`)
     return b
   }
 
@@ -114,10 +116,23 @@ export const useRooms = defineStore('rooms', () => {
   const nightsFor = (b, outDay = dateKey()) => Math.max(1, diffDays(b.checkIn, outDay))
 
   /**
+   * Giá phòng của từng lượt đặt (không cố định theo phòng):
+   * b.priceMode = 'night' (giá / đêm, b.rate) | 'package' (trọn gói cả kỳ ở, b.packagePrice)
+   * Lượt đặt cũ chưa có giá riêng -> dùng giá niêm yết của phòng.
+   */
+  const rateOf = (b) => (b?.rate != null && b.rate !== '' ? +b.rate : +(roomById(b?.roomId)?.price || 0))
+  const isPackage = (b) => b?.priceMode === 'package'
+  function roomChargeFor(b, nights = diffDays(b.checkIn, b.checkOut)) {
+    return isPackage(b) ? +b.packagePrice || 0 : Math.max(0, nights) * rateOf(b)
+  }
+  /** Giá có khác giá niêm yết không (để hiện nhãn "Giá riêng") */
+  const customPrice = (b) => isPackage(b) || (b?.rate != null && +b.rate !== +(roomById(b.roomId)?.price || 0))
+
+  /**
    * Trả phòng: chốt số đêm, tạo hoá đơn tiền phòng, đánh dấu phòng "chờ dọn"
    * extras: [{ productId?, name, price, qty }]
    */
-  function checkOut(id, { extras = [], discount = 0, method = 'cash', note = '' } = {}) {
+  function checkOut(id, { extras = [], discount = 0, method = 'cash', note = '', price = null } = {}) {
     const b = bookingById(id)
     const room = roomById(b.roomId)
     const today = dateKey()
@@ -128,10 +143,12 @@ export const useRooms = defineStore('rooms', () => {
       const c = findConflict({ roomId: b.roomId, checkIn: b.checkOut, checkOut: newOut, id: b.id })
       if (c) throw new Error(`Trả phòng muộn sẽ trùng lịch ${c.code} (${c.guestName}) — sửa lại lịch rồi trả phòng`)
     }
-    const items = [
-      { name: `Phòng ${room.name} (${room.type}) × ${nights} đêm`, price: room.price, cost: 0, qty: nights },
-      ...extras,
-    ]
+    // Giá chốt lúc trả phòng (có thể đã sửa ngay trong màn trả phòng)
+    const pr = price || { priceMode: b.priceMode || 'night', rate: rateOf(b), packagePrice: b.packagePrice }
+    const roomLine = pr.priceMode === 'package'
+      ? { name: `Phòng ${room.name} (${room.type}) · trọn gói ${nights} đêm`, price: Math.max(0, Math.round(+pr.packagePrice || 0)), cost: 0, qty: 1 }
+      : { name: `Phòng ${room.name} (${room.type}) × ${nights} đêm`, price: Math.max(0, Math.round(+pr.rate || 0)), cost: 0, qty: nights }
+    const items = [roomLine, ...extras]
     const inv = invoices.create({
       type: 'room',
       customerId: b.customerId,
@@ -143,6 +160,9 @@ export const useRooms = defineStore('rooms', () => {
       bookingId: b.id,
       deposit: b.deposit,
     })
+    b.priceMode = pr.priceMode
+    if (pr.priceMode === 'package') b.packagePrice = roomLine.price
+    else b.rate = roomLine.price
     b.status = 'checked_out'
     b.checkedOutAt = new Date().toISOString()
     b.checkOut = newOut
@@ -187,7 +207,7 @@ export const useRooms = defineStore('rooms', () => {
 
   return {
     rooms, bookings, liveBookings, roomById, bookingById, bookingOn, stayingIn, nextBooking,
-    statusOf, summary, findConflict, saveBooking, checkIn, checkOut, nightsFor, cancelBooking,
+    statusOf, summary, findConflict, saveBooking, checkIn, checkOut, nightsFor, rateOf, isPackage, roomChargeFor, customPrice, priceText, cancelBooking,
     markClean, saveRoom, removeRoom,
   }
 })

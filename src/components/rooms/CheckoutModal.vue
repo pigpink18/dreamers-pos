@@ -10,8 +10,9 @@ import { useAuth } from '../../stores/auth'
 import { useAudit } from '../../stores/audit'
 import { PAY_METHODS } from '../../stores/invoices'
 import VietQrCard from '../payment/VietQrCard.vue'
-import { money, number, fmtDate, dateKey } from '../../utils/format'
+import { money, number, fmtDate, dateKey, diffDays } from '../../utils/format'
 import DiscountInput from '../ui/DiscountInput.vue'
+import RoomRateInput from './RoomRateInput.vue'
 
 const props = defineProps({ bookingId: String })
 const emit = defineEmits(['close', 'done'])
@@ -23,7 +24,12 @@ const auth = useAuth()
 const b = computed(() => rooms.bookingById(props.bookingId))
 const room = computed(() => rooms.roomById(b.value.roomId))
 const nights = computed(() => rooms.nightsFor(b.value))
-const roomCharge = computed(() => nights.value * room.value.price)
+// Giá đã thoả thuận lúc đặt phòng; sửa lại được ngay khi trả phòng
+const agreed = computed(() => rooms.roomChargeFor(b.value, nights.value))
+const price = ref({ priceMode: b.value?.priceMode || 'night', rate: rooms.rateOf(b.value), packagePrice: +b.value?.packagePrice || 0 })
+const editPrice = ref(false)
+const roomCharge = computed(() => rooms.roomChargeFor(price.value, nights.value))
+const bookedNights = computed(() => Math.max(1, diffDays(b.value.checkIn, b.value.checkOut)))
 
 // Dịch vụ / đồ dùng phát sinh trong thời gian ở
 const extras = ref([])
@@ -55,21 +61,22 @@ async function confirm() {
   }
   // Thu tiền phòng cũng phải nằm trong một ca
   if (!(await ui.requireShift())) return
-  // Giảm giá vượt mức cho phép -> cần duyệt
-  const gross = roomCharge.value + extrasTotal.value
+  // Giảm giá (kể cả hạ giá phòng so với giá đã thoả thuận) vượt mức cho phép -> cần duyệt
   const disc = +discount.value || 0
-  const pct = gross ? Math.ceil((disc / gross) * 100) : 0
-  if (disc > 0 && (!auth.can('pos.discount') || pct > auth.maxDiscount)) {
+  const cut = Math.max(0, agreed.value - roomCharge.value) + disc
+  const gross = agreed.value + extrasTotal.value
+  const pct = gross ? Math.ceil((cut / gross) * 100) : 0
+  if (cut > 0 && (!auth.can('pos.discount') || pct > auth.maxDiscount)) {
     const approver = await ui.approve({
       perm: 'pos.discount',
-      reason: `Giảm ${money(disc)} (${pct}%) tiền phòng ${room.value.name}`,
+      reason: `Giảm ${money(cut)} (${pct}%) tiền phòng ${room.value.name}`,
       check: (u) => (auth.roleById(u.roleId)?.maxDiscount ?? 0) >= pct,
     })
     if (!approver) return
-    useAudit().log('invoice.discount', `Giảm ${money(disc)} (${pct}%) khi trả phòng ${room.value.name}`, { approvedBy: approver })
+    useAudit().log('invoice.discount', `Giảm ${money(cut)} (${pct}%) khi trả phòng ${room.value.name}`, { approvedBy: approver })
   }
   let inv
-  try { inv = rooms.checkOut(b.value.id, { extras: extras.value.filter((e) => e.qty > 0), discount: disc, method: method.value }) }
+  try { inv = rooms.checkOut(b.value.id, { extras: extras.value.filter((e) => e.qty > 0), discount: disc, method: method.value, price: { ...price.value } }) }
   catch (e) { return ui.toast(e.message, 'error') }
   ui.toast(`Đã trả phòng ${room.value.name} · ${inv.code}`)
   emit('done', inv)
@@ -86,10 +93,25 @@ async function confirm() {
       <div><span class="muted">Số đêm</span><b>{{ nights }}</b></div>
     </div>
 
-    <table class="table mt-16">
+    <table class="table mt-16 co-table">
       <tbody>
         <tr>
-          <td>Tiền phòng {{ room.type }} <span class="muted">({{ nights }} × {{ number(room.price) }})</span></td>
+          <td>
+            <div class="co-room">
+              <div>
+                Tiền phòng {{ room.type }}
+                <span v-if="price.priceMode === 'package'" class="muted">(trọn gói {{ nights }} đêm)</span>
+                <span v-else class="muted num">({{ nights }} × {{ number(price.rate) }})</span>
+                <span v-if="roomCharge !== nights * room.price" class="badge co-room__tag">Giá riêng</span>
+              </div>
+              <button type="button" class="btn btn--ghost btn--sm" @click="editPrice = !editPrice">
+                <Icon :name="editPrice ? 'check' : 'edit'" :size="14" />{{ editPrice ? 'Xong' : 'Sửa giá' }}
+              </button>
+            </div>
+            <div v-if="price.priceMode === 'package' && nights !== bookedNights" class="co-room__warn">
+              Trọn gói đặt cho {{ bookedNights }} đêm, khách ở thực tế {{ nights }} đêm — kiểm tra lại giá.
+            </div>
+          </td>
           <td class="text-right num fw-600">{{ money(roomCharge) }}</td>
         </tr>
         <tr v-for="(e, i) in extras" :key="e.productId">
@@ -105,7 +127,12 @@ async function confirm() {
         </tr>
       </tbody>
     </table>
-    <div class="flex mt-16">
+    <RoomRateInput
+      v-if="editPrice" class="mt-16"
+      :list-price="room.price" :nights="nights"
+      v-model:mode="price.priceMode" v-model:rate="price.rate" v-model:pkg="price.packagePrice"
+    />
+    <div class="flex mt-16 co-pick">
       <AppSelect
         v-model="pickId" @change="addExtra" style="flex: 1" :searchable="true"
         placeholder="+ Thêm dịch vụ / đồ dùng phát sinh (minibar, giặt ủi, thuê xe...)"
@@ -143,4 +170,16 @@ async function confirm() {
   .big { font-size: 17px; b { font-size: 22px; color: var(--primary); } }
 }
 .segmented--full { display: flex; button { flex: 1; } }
+.co-table { table-layout: fixed; width: 100%; td:last-child { width: 120px; white-space: nowrap; } }
+.co-pick { min-width: 0; > * { min-width: 0; } }
+@media (max-width: 640px) {
+  .co-head { grid-template-columns: 1fr 1fr; }
+  .co-table td:last-child { width: 100px; }
+  .co-room { flex-wrap: wrap; }
+}
+.co-room {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  &__tag { margin-left: 6px; background: var(--warning-soft); color: var(--warning); }
+  &__warn { margin-top: 6px; font-size: 12px; color: var(--warning); }
+}
 </style>

@@ -145,6 +145,13 @@ async function act(kind) {
         <dt>Phòng</dt><dd>{{ rooms.roomById(selected.roomId)?.name }} · {{ rooms.roomById(selected.roomId)?.type }}</dd>
         <dt>Thời gian</dt><dd>{{ fmtDate(selected.checkIn) }} → {{ fmtDate(selected.checkOut) }} ({{ diffDays(selected.checkIn, selected.checkOut) }} đêm)</dd>
         <dt>Số khách</dt><dd>{{ selected.guests }}</dd>
+        <dt>Giá phòng</dt>
+        <dd class="num">
+          <template v-if="rooms.isPackage(selected)">Trọn gói {{ money(selected.packagePrice) }}</template>
+          <template v-else>{{ money(rooms.rateOf(selected)) }} / đêm</template>
+          <span class="muted"> · tổng {{ money(rooms.roomChargeFor(selected)) }}</span>
+          <span v-if="rooms.customPrice(selected)" class="badge cal-custom">Giá riêng</span>
+        </dd>
         <dt>Đặt cọc</dt><dd class="num">{{ money(selected.deposit) }}</dd>
         <dt v-if="selected.note">Ghi chú</dt><dd v-if="selected.note">{{ selected.note }}</dd>
       </dl>
@@ -172,6 +179,7 @@ async function act(kind) {
 <style lang="scss">
 @use '../styles/tokens' as *;
 .timeline-card { overflow: hidden; }
+.cal-custom { margin-left: 6px; background: var(--warning-soft); color: var(--warning); }
 .timeline { overflow-x: auto; }
 .tl-row { display: flex; border-bottom: 1px solid $border; min-width: calc(140px + var(--days) * 44px); }
 .tl-room { width: 140px; flex-shrink: 0; padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid $border; background: $surface; position: sticky; left: 0; z-index: 2; span { font-size: 12px; } }
