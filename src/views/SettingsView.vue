@@ -12,6 +12,7 @@ import PaymentSettings from '../components/settings/PaymentSettings.vue'
 import ServerSettings from '../components/settings/ServerSettings.vue'
 import EinvoiceSettings from '../components/settings/EinvoiceSettings.vue'
 import ChannelSettings from '../components/settings/ChannelSettings.vue'
+import PrinterSettings from '../components/settings/PrinterSettings.vue'
 import { useSettings } from '../stores/settings'
 import { useUi } from '../stores/ui'
 import { useAuth, PERMISSION_GROUPS, initials } from '../stores/auth'
@@ -219,7 +220,8 @@ async function wipe(withDemo) {
         </template>
 
         <!-- ============ CỬA HÀNG ============ -->
-        <section v-else-if="tab === 'shop'" class="card">
+        <template v-else-if="tab === 'shop'">
+        <section class="card">
           <div class="card__header"><h3>Thông tin in trên hoá đơn</h3></div>
           <form class="card__body form-grid" @submit.prevent="saveShop">
             <div class="field full"><label>Tên cửa hàng</label><input class="input" v-model="shop.name" /></div>
@@ -229,6 +231,8 @@ async function wipe(withDemo) {
             <div class="full"><button class="btn btn--primary"><Icon name="check" :size="15" />Lưu thay đổi</button></div>
           </form>
         </section>
+        <PrinterSettings />
+        </template>
 
         <!-- ============ NGƯỜI DÙNG ============ -->
         <section v-else-if="tab === 'users'" class="card">

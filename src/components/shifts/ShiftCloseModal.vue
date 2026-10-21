@@ -6,7 +6,7 @@ import Icon from '../ui/Icon.vue'
 import ShiftPrintModal from './ShiftPrintModal.vue'
 import { useShifts, DENOMINATIONS } from '../../stores/shifts'
 import { useUi } from '../../stores/ui'
-import { money, number, fmtDateTime } from '../../utils/format'
+import { money, number, fmtDateTime, dateKey } from '../../utils/format'
 import MoneyInput from '../ui/MoneyInput.vue'
 
 const emit = defineEmits(['close', 'closed'])
@@ -24,6 +24,11 @@ const counted = computed(() =>
 const diff = computed(() => counted.value - sum.value.expectedCash)
 const note = ref('')
 const done = ref(null) // ca vừa đóng -> chuyển sang màn hình in
+// Sau khi đóng ca in phiếu nào (chọn được, có gợi ý sẵn):
+// - Hôm nay đã có người KHÁC làm ca trước  -> chia ca: in PHIẾU CHỐT CA của ca này
+// - Chỉ mình người này làm hôm nay: đóng trước 15h -> giao ca (phiếu chốt ca); từ 15h -> đóng cửa cuối ngày (TỔNG KẾT NGÀY)
+const otherToday = shifts.items.some((x) => x.id !== s.id && dateKey(x.openedAt) === dateKey(s.openedAt) && x.userId !== s.userId)
+const printKind = ref(otherToday ? 'shift' : new Date().getHours() >= 15 ? 'day' : 'shift')
 
 async function submit() {
   if (diff.value !== 0 && !note.value.trim())
@@ -37,10 +42,14 @@ async function submit() {
 </script>
 
 <template>
-  <ShiftPrintModal v-if="done" :shift="done" tab="day" @close="emit('close')">
+  <ShiftPrintModal v-if="done" :shift="done" :tab="printKind" @close="emit('close')">
     <div class="closed-ok">
       <Icon name="fa-circle-check" :size="20" />
-      <div><b>Đã đóng ca {{ done.code }}</b><span>In phiếu chốt ca hoặc tổng kết cả ngày hôm nay.</span></div>
+      <div>
+        <b>Đã đóng ca {{ done.code }}</b>
+        <span v-if="printKind === 'day'">Ca cuối ngày — in <b>Tổng kết ngày</b> để chốt sổ cả ngày (có thể chuyển sang Phiếu chốt ca).</span>
+        <span v-else>Giao ca — in <b>Phiếu chốt ca</b> tổng tiền của riêng ca này (có thể chuyển sang Tổng kết ngày).</span>
+      </div>
     </div>
   </ShiftPrintModal>
   <BaseModal v-else :title="`Đóng ca ${s.code}`" width="720px" @close="emit('close')">
@@ -90,6 +99,17 @@ async function submit() {
           <label>Ghi chú {{ diff !== 0 ? '(bắt buộc khi lệch két)' : '' }}</label>
           <input class="input" v-model="note" placeholder="VD: thối nhầm tiền lẻ" />
         </div>
+        <div class="field mt-16">
+          <label>Đóng ca xong sẽ in</label>
+          <div class="print-kind" role="radiogroup">
+            <button type="button" role="radio" :aria-checked="printKind === 'shift'" :class="{ active: printKind === 'shift' }" @click="printKind = 'shift'">
+              <b>Phiếu chốt ca</b><small>Chia ca sáng / chiều: tổng tiền của riêng ca này để giao ca</small>
+            </button>
+            <button type="button" role="radio" :aria-checked="printKind === 'day'" :class="{ active: printKind === 'day' }" @click="printKind = 'day'">
+              <b>Tổng kết ngày</b><small>Ca cuối / làm cả ngày: tổng tất cả ca trong ngày để chốt sổ</small>
+            </button>
+          </div>
+        </div>
       </section>
     </div>
     <template #footer>
@@ -112,6 +132,15 @@ async function submit() {
   margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: $surface-2; display: flex; flex-direction: column; gap: 6px;
   div { display: flex; justify-content: space-between; }
   .total { padding-top: 8px; border-top: 1px solid $border; font-weight: 600; b { font-size: 17px; } }
+}
+.print-kind {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  button {
+    display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-align: left; border: 0; border-radius: 12px; cursor: pointer;
+    background: $surface; box-shadow: inset 0 0 0 1px $border-strong; font: inherit; color: $text;
+    small { font-size: 12px; color: $text-2; line-height: 1.35; }
+    &.active { background: $primary-soft; box-shadow: inset 0 0 0 2px $primary; b { color: $primary; } }
+  }
 }
 .closed-ok {
   display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin-bottom: 14px; border-radius: 14px; background: $success-soft; color: $success;

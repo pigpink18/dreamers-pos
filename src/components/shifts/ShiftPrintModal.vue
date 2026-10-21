@@ -1,4 +1,5 @@
 <script setup>
+import { printReceipt } from '../../utils/print'
 /** Xem & in: Phiếu chốt ca | Tổng kết ngày (ngày của ca đó) */
 import { ref, computed } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
@@ -16,7 +17,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 const view = ref(props.shift ? props.tab : 'day')
 const day = computed(() => props.date || (props.shift ? dateKey(props.shift.openedAt) : dateKey()))
-const print = () => window.print()
+const print = () => printReceipt()
 </script>
 
 <template>

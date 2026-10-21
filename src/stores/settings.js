@@ -36,6 +36,8 @@ export const useSettings = defineStore('settings', () => {
     autoIssue: false, // tự xuất HĐĐT sau mỗi lần thanh toán
     vatRate: 8, // % thuế GTGT áp dụng (tuỳ chính sách từng kỳ)
   })
+  /** Máy in hoá đơn: khổ giấy '80' (K80) | '58' (K58) | 'a4' */
+  const printer = useStorage('printer', { paper: '80' })
   /** Đồng bộ lịch OTA (iCal) */
   const channels = useStorage('channels', { autoSyncMin: 15, lastSync: null })
 
@@ -45,5 +47,5 @@ export const useSettings = defineStore('settings', () => {
     return prefix + String(counters.value[prefix]).padStart(digits, '0')
   }
 
-  return { shop, counters, ops, payment, einvoice, channels, nextCode }
+  return { shop, counters, ops, payment, einvoice, channels, printer, nextCode }
 })

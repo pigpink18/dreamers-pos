@@ -1,4 +1,5 @@
 <script setup>
+import { printReceipt } from '../../utils/print'
 import { ref, computed, onMounted } from 'vue'
 import BaseModal from '../ui/BaseModal.vue'
 import Icon from '../ui/Icon.vue'
@@ -22,7 +23,7 @@ const shiftCode = computed(() => shifts.byId(inv.value?.shiftId)?.code)
 const settings = useSettings()
 const einvOn = computed(() => settings.einvoice.provider && settings.einvoice.provider !== 'none')
 const einvOpen = ref(false)
-const print = () => window.print()
+const print = () => printReceipt()
 onMounted(() => props.autoPrint && setTimeout(print, 300))
 
 // Huỷ hoá đơn: bắt buộc ghi lý do + người có quyền "Huỷ hoá đơn" duyệt
