@@ -25,7 +25,9 @@ export const useShifts = defineStore('shifts', () => {
   function summary(shift) {
     const inv = useInvoices().items.filter((i) => i.shiftId === shift.id)
     const done = inv.filter((i) => i.status === 'completed')
-    const by = (m) => done.filter((i) => i.method === m).reduce((s, i) => s + i.total, 0)
+    // Tiền thực thu trong ca: hoá đơn phòng đã đặt cọc trước thì chỉ thu phần còn lại (cọc âm = hoàn lại khách)
+    const collected = (i) => i.total - (i.deposit || 0)
+    const by = (m) => done.filter((i) => i.method === m).reduce((s, i) => s + collected(i), 0)
     const cashSales = by('cash')
     return {
       count: done.length,
@@ -37,6 +39,7 @@ export const useShifts = defineStore('shifts', () => {
       card: by('card'),
       retail: done.filter((i) => i.type === 'retail').reduce((s, i) => s + i.total, 0),
       room: done.filter((i) => i.type === 'room').reduce((s, i) => s + i.total, 0),
+      deposits: done.reduce((s, i) => s + (i.deposit || 0), 0), // cọc đã thu từ trước, không nằm trong ca này
       expectedCash: (shift.openingCash || 0) + cashSales,
     }
   }

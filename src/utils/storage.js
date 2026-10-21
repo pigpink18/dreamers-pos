@@ -32,11 +32,16 @@ export function clearAll(keep = []) {
 export function exportAll() {
   const out = {}
   Object.keys(localStorage)
-    .filter((k) => k.startsWith(PREFIX))
-    .forEach((k) => (out[k.slice(PREFIX.length)] = JSON.parse(localStorage.getItem(k))))
+    .filter((k) => k.startsWith(PREFIX) && !k.startsWith(PREFIX + 'sync:')) // bỏ thông tin đồng bộ riêng của máy
+    .forEach((k) => {
+      const raw = localStorage.getItem(k)
+      // vài khoá lưu chữ thường (không phải JSON), VD mã máy đồng bộ -> giữ nguyên chữ
+      try { out[k.slice(PREFIX.length)] = JSON.parse(raw) } catch { out[k.slice(PREFIX.length)] = raw }
+    })
   return out
 }
 export function importAll(obj) {
   clearAll()
-  Object.entries(obj).forEach(([k, v]) => localStorage.setItem(PREFIX + k, JSON.stringify(v)))
+  // không chép thông tin đồng bộ của máy khác (mã máy, hàng đợi) sang máy này
+  Object.entries(obj).filter(([k]) => !k.startsWith('sync:')).forEach(([k, v]) => localStorage.setItem(PREFIX + k, JSON.stringify(v)))
 }

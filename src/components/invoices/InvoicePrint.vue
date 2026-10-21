@@ -36,13 +36,15 @@ const settings = useSettings()
       <div><span>Tổng tiền hàng</span><b>{{ money(invoice.subtotal) }}</b></div>
       <div v-if="invoice.discount"><span>Giảm giá</span><b>-{{ money(invoice.discount) }}</b></div>
       <div class="grand"><span>Thanh toán</span><b>{{ money(invoice.total) }}</b></div>
-      <div v-if="invoice.deposit"><span>Đã đặt cọc</span><b>{{ money(invoice.deposit) }}</b></div>
+      <div v-if="invoice.deposit"><span>Đã đặt cọc</span><b>-{{ money(invoice.deposit) }}</b></div>
+      <div v-if="invoice.deposit && invoice.total >= invoice.deposit" class="grand"><span>Còn phải trả</span><b>{{ money(invoice.total - invoice.deposit) }}</b></div>
+      <div v-if="invoice.deposit && invoice.total < invoice.deposit" class="grand"><span>Hoàn lại khách</span><b>{{ money(invoice.deposit - invoice.total) }}</b></div>
       <div><span>Hình thức</span><b>{{ PAY_METHODS[invoice.method] }}</b></div>
       <div v-if="invoice.paid > invoice.total"><span>Khách đưa</span><b>{{ money(invoice.paid) }}</b></div>
       <div v-if="invoice.paid > invoice.total"><span>Tiền thừa</span><b>{{ money(invoice.paid - invoice.total) }}</b></div>
     </div>
     <VietQrCard
-      v-if="invoice.method === 'transfer' && invoice.status !== 'cancelled' && settings.payment.qrOnReceipt"
+      v-if="invoice.method === 'transfer' && invoice.status !== 'cancelled' && settings.payment.qrOnReceipt && invoice.total - (invoice.deposit || 0) > 0"
       compact :amount="invoice.total - (invoice.deposit || 0)" :note="`${invoice.code} Dreamers`"
     />
     <div v-if="invoice.status === 'cancelled'" class="receipt__void">ĐÃ HUỶ</div>

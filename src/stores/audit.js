@@ -17,7 +17,7 @@ export const ACTIONS = {
   'room.checkin': ['Nhận phòng', 'login'], 'room.checkout': ['Trả phòng', 'logout'], 'room.clean': ['Dọn phòng xong', 'broom'], 'room.update': ['Sửa phòng', 'bed'],
   'product.create': ['Thêm hàng hoá', 'box'], 'product.update': ['Sửa hàng hoá', 'edit'], 'product.price': ['Đổi giá bán', 'money'], 'product.disable': ['Ngừng bán', 'trash'],
   'stock.import': ['Nhập kho', 'upload'],
-  'customer.create': ['Thêm khách', 'users'], 'customer.delete': ['Xoá khách', 'trash'],
+  'customer.create': ['Thêm khách', 'users'], 'customer.update': ['Sửa khách', 'users'], 'customer.delete': ['Xoá khách', 'trash'],
   'user.create': ['Thêm người dùng', 'user-plus'], 'user.update': ['Sửa người dùng', 'users'], 'user.disable': ['Khoá tài khoản', 'key'], 'user.enable': ['Mở tài khoản', 'key'],
   'role.update': ['Phân quyền', 'settings'], 'role.delete': ['Xoá vai trò', 'trash'],
   'settings.update': ['Đổi cài đặt', 'settings'], 'data.reset': ['Xoá / nạp lại dữ liệu', 'alert'], 'data.restore': ['Khôi phục dữ liệu', 'upload'],

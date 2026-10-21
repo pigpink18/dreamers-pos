@@ -3,7 +3,7 @@
  * CÀI ĐẶT — chia tab, mỗi tab chỉ hiện với người có quyền:
  *  Giao diện (ai cũng chỉnh được cho máy mình) · Cửa hàng · Người dùng · Phân quyền · Vận hành · Dữ liệu
  */
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Icon from '../components/ui/Icon.vue'
 import BaseModal from '../components/ui/BaseModal.vue'
@@ -124,8 +124,11 @@ function restore(e) {
     try {
       const data = JSON.parse(reader.result)
       if (!(await ui.confirm('Khôi phục sẽ ghi đè toàn bộ dữ liệu hiện tại. Tiếp tục?', { danger: true, okText: 'Khôi phục' }))) return
+      // ghi nhật ký vào chính dữ liệu được khôi phục, đợi các thay đổi đang chờ lưu xong rồi mới ghi đè
       audit.log('data.restore', `Khôi phục từ file ${f.name}`)
-      importAll(data)
+      const entry = audit.entries[0]
+      await nextTick()
+      importAll({ ...data, audit: [entry, ...(Array.isArray(data.audit) ? data.audit : [])] })
       location.reload()
     } catch {
       ui.toast('File sao lưu không hợp lệ', 'error')

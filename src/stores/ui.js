@@ -38,6 +38,8 @@ export const useUi = defineStore('ui', () => {
     const auth = useAuth()
     const ok = (u) => (!perm || auth.userCan(u, perm)) && (!check || check(u))
     if (auth.user && ok(auth.user)) return Promise.resolve(auth.user)
+    // bỏ con trỏ khỏi ô đang nhập: PIN gõ bằng bàn phím không được lọt vào ô giảm giá / số tiền
+    document.activeElement?.blur?.()
     return new Promise((resolve) => {
       approvalState.value = { perm, reason, ok, resolve }
     })

@@ -60,7 +60,12 @@ function onCell(room, day) {
 }
 async function act(kind) {
   const b = selected.value
-  if (kind === 'checkin') { rooms.checkIn(b.id); ui.toast(`${b.guestName} đã nhận phòng`) }
+  if (kind === 'checkin') {
+    const r = rooms.roomById(b.roomId)
+    if (r?.housekeeping === 'dirty' && !(await ui.confirm(`Phòng ${r.name} chưa dọn. Vẫn nhận phòng?`, { okText: 'Vẫn nhận phòng' }))) return
+    try { rooms.checkIn(b.id) } catch (e) { return ui.toast(e.message, 'error') }
+    ui.toast(`${b.guestName} đã nhận phòng`)
+  }
   if (kind === 'cancel') {
     if (!(await ui.confirm(`Huỷ đặt phòng ${b.code}?`, { danger: true, okText: 'Huỷ đặt phòng' }))) return
     // Đã đặt cọc -> huỷ là phải hoàn tiền, cần người có quyền huỷ/hoàn tiền duyệt

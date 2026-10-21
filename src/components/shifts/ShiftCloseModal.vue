@@ -7,6 +7,7 @@ import ShiftPrintModal from './ShiftPrintModal.vue'
 import { useShifts, DENOMINATIONS } from '../../stores/shifts'
 import { useUi } from '../../stores/ui'
 import { money, number, fmtDateTime } from '../../utils/format'
+import MoneyInput from '../ui/MoneyInput.vue'
 
 const emit = defineEmits(['close', 'closed'])
 const shifts = useShifts()
@@ -18,7 +19,7 @@ const counts = ref(Object.fromEntries(DENOMINATIONS.map((d) => [d, 0])))
 const useCounter = ref(true)
 const manual = ref(null)
 const counted = computed(() =>
-  useCounter.value ? DENOMINATIONS.reduce((t, d) => t + d * (+counts.value[d] || 0), 0) : +manual.value || 0
+  useCounter.value ? DENOMINATIONS.reduce((t, d) => t + d * Math.max(0, Math.floor(+counts.value[d] || 0)), 0) : +manual.value || 0
 )
 const diff = computed(() => counted.value - sum.value.expectedCash)
 const note = ref('')
@@ -75,11 +76,11 @@ async function submit() {
           <div v-for="d in DENOMINATIONS" :key="d" class="denom">
             <span class="denom__face num">{{ number(d) }}</span>
             <span class="muted">×</span>
-            <input class="input num" type="number" min="0" v-model.number="counts[d]" />
+            <input class="input num" type="number" min="0" step="1" inputmode="numeric" v-model.number="counts[d]" @blur="counts[d] = Math.max(0, Math.floor(+counts[d] || 0))" />
             <span class="denom__sum num">{{ number(d * (+counts[d] || 0)) }}</span>
           </div>
         </div>
-        <input v-else class="input input--money num" type="number" min="0" step="1000" v-model="manual" placeholder="Tổng tiền đếm được" />
+        <MoneyInput v-else class="input--money" nullable v-model="manual" placeholder="Tổng tiền đếm được" />
 
         <div class="result" :class="diff === 0 ? 'ok' : diff > 0 ? 'over' : 'short'">
           <div><span>Đếm được</span><b class="num">{{ money(counted) }}</b></div>

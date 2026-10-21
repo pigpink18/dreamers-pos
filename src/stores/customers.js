@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { useStorage } from '../utils/storage'
-import { uid } from '../utils/format'
+import { uid, normalizePhone } from '../utils/format'
 import { useSettings } from './settings'
 import { useAudit } from './audit'
 
@@ -10,11 +10,14 @@ export const useCustomers = defineStore('customers', () => {
   const items = useStorage('customers', [])
 
   const byId = (id) => items.value.find((c) => c.id === id)
-  const byPhone = (phone) => items.value.find((c) => c.phone && c.phone === phone)
+  const byPhone = (phone) => { const p = normalizePhone(phone); return p ? items.value.find((c) => c.phone && normalizePhone(c.phone) === p) : undefined }
 
   function save(data) {
+    if (data.phone) data = { ...data, phone: normalizePhone(data.phone) }
     if (data.id) {
-      Object.assign(byId(data.id), data)
+      const c = byId(data.id)
+      Object.assign(c, data)
+      useAudit().log('customer.update', `${c.code} · ${c.name}`)
       return data.id
     }
     const c = { ...data, id: uid(), code: settings.nextCode('KH'), createdAt: new Date().toISOString() }

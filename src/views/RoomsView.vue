@@ -12,6 +12,7 @@ import { useRooms, ROOM_STATUS, BOOKING_STATUS } from '../stores/rooms'
 import { useUi } from '../stores/ui'
 import { useAuth, initials } from '../stores/auth'
 import { money, number, fmtDate, dateKey, diffDays } from '../utils/format'
+import MoneyInput from '../components/ui/MoneyInput.vue'
 
 const rooms = useRooms()
 const ui = useUi()
@@ -61,7 +62,7 @@ const roomForm = ref(null)
 async function doCheckIn(b) {
   const r = rooms.roomById(b.roomId)
   if (r.housekeeping === 'dirty' && !(await ui.confirm(`Phòng ${r.name} chưa dọn. Vẫn nhận phòng?`, { okText: 'Vẫn nhận phòng' }))) return
-  rooms.checkIn(b.id)
+  try { rooms.checkIn(b.id) } catch (e) { return ui.toast(e.message, 'error') }
   ui.toast(`${b.guestName} đã nhận phòng ${r.name}`)
 }
 async function doCancel(b) {
@@ -243,7 +244,7 @@ async function deleteRoom(r) {
         <div class="field"><label>Loại phòng</label><input class="input" v-model="roomForm.type" /></div>
         <div class="field"><label>Tầng</label><input class="input" type="number" v-model="roomForm.floor" /></div>
         <div class="field"><label>Sức chứa (khách)</label><input class="input" type="number" min="1" v-model="roomForm.capacity" /></div>
-        <div class="field full"><label>Giá / đêm</label><input class="input num" type="number" min="0" step="50000" v-model="roomForm.price" /></div>
+        <div class="field full"><label>Giá / đêm</label><MoneyInput v-model="roomForm.price" /></div>
       </form>
       <template #footer>
         <button v-if="roomForm.id" class="btn btn--danger" @click="deleteRoom(roomForm)"><Icon name="trash" :size="16" />Xoá</button>

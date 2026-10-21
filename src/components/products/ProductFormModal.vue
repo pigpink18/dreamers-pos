@@ -8,6 +8,7 @@ import BaseModal from '../ui/BaseModal.vue'
 import Icon from '../ui/Icon.vue'
 import { useProducts } from '../../stores/products'
 import { useUi } from '../../stores/ui'
+import MoneyInput from '../ui/MoneyInput.vue'
 
 const props = defineProps({ product: { type: Object, default: null }, category: { type: String, default: '' }, trackStock: { type: Boolean, default: true } })
 const emit = defineEmits(['close', 'saved'])
@@ -26,7 +27,7 @@ function save() {
   if (!f.name.trim()) return ui.toast('Nhập tên món', 'error')
   if (!f.category.trim()) return ui.toast('Nhập nhóm món', 'error')
   if (!(+f.price >= 0)) return ui.toast('Giá bán không hợp lệ', 'error')
-  const id = products.save({ ...f, name: f.name.trim(), category: f.category.trim(), price: +f.price, cost: +f.cost || 0, stock: +f.stock || 0, minStock: +f.minStock || 0 })
+  const id = products.save({ ...f, name: f.name.trim(), category: f.category.trim(), price: +f.price, cost: +f.cost || 0, stock: Math.max(0, Math.round(+f.stock || 0)), minStock: Math.max(0, Math.round(+f.minStock || 0)) })
   ui.toast(f.id ? `Đã cập nhật ${f.name}` : `Đã thêm ${f.name} vào menu`)
   emit('saved', id)
   emit('close')
@@ -41,7 +42,7 @@ async function remove() {
 
 <template>
   <BaseModal :title="f.id ? 'Sửa món' : 'Thêm món'" @close="emit('close')">
-    <form id="pform" class="form-grid" @submit.prevent="save">
+    <form id="pform" class="form-grid" novalidate @submit.prevent="save">
       <div class="field full"><label>Tên món *</label><input class="input" v-model="f.name" autofocus placeholder="VD: Bạc xỉu đá" /></div>
       <div class="field full"><label>Mô tả ngắn</label><input class="input" v-model="f.desc" placeholder="VD: Ginger with cinnamon and arabica coffee" /></div>
       <div class="field">
@@ -50,12 +51,12 @@ async function remove() {
         <datalist id="pform-cats"><option v-for="c in products.categories" :key="c" :value="c" /></datalist>
       </div>
       <div class="field"><label>Đơn vị tính</label><input class="input" v-model="f.unit" /></div>
-      <div class="field"><label>Giá bán *</label><input class="input num" type="number" min="0" step="1000" v-model="f.price" /></div>
-      <div class="field"><label>Giá vốn</label><input class="input num" type="number" min="0" step="1000" v-model="f.cost" /></div>
+      <div class="field"><label>Giá bán *</label><MoneyInput v-model="f.price" /></div>
+      <div class="field"><label>Giá vốn</label><MoneyInput v-model="f.cost" /></div>
       <label class="flex full" style="cursor: pointer"><input type="checkbox" v-model="f.trackStock" /> Quản lý tồn kho (đồ đóng chai, bánh… — đồ pha chế thì bỏ chọn)</label>
       <template v-if="f.trackStock">
-        <div class="field"><label>{{ f.id ? 'Tồn kho hiện tại' : 'Tồn kho ban đầu' }}</label><input class="input num" type="number" v-model="f.stock" /></div>
-        <div class="field"><label>Cảnh báo khi tồn ≤</label><input class="input num" type="number" min="0" v-model="f.minStock" /></div>
+        <div class="field"><label>{{ f.id ? 'Tồn kho hiện tại' : 'Tồn kho ban đầu' }}</label><input class="input num" type="number" min="0" step="1" inputmode="numeric" v-model="f.stock" /></div>
+        <div class="field"><label>Cảnh báo khi tồn ≤</label><input class="input num" type="number" min="0" step="1" inputmode="numeric" v-model="f.minStock" /></div>
       </template>
       <div class="field full">
         <label>Màu thẻ trên màn hình bán hàng</label>

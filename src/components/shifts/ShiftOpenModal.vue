@@ -6,6 +6,7 @@ import { useShifts } from '../../stores/shifts'
 import { useAuth } from '../../stores/auth'
 import { useUi } from '../../stores/ui'
 import { money } from '../../utils/format'
+import MoneyInput from '../ui/MoneyInput.vue'
 
 const emit = defineEmits(['close', 'opened'])
 const shifts = useShifts()
@@ -38,7 +39,7 @@ function submit() {
     <form id="shift-open" class="form-grid" style="grid-template-columns: 1fr" @submit.prevent="submit">
       <div class="field">
         <label>Tiền mặt đầu ca (trong két)</label>
-        <input class="input input--money num" type="number" min="0" step="1000" v-model.number="opening" autofocus />
+        <MoneyInput class="input--money" v-model="opening" autofocus />
         <small v-if="last" class="muted">Ca trước ({{ last.code }}) để lại {{ money(last.countedCash) }}</small>
       </div>
       <div class="field"><label>Ghi chú</label><input class="input" v-model="note" placeholder="Không bắt buộc" /></div>

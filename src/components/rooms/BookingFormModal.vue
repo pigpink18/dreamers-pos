@@ -8,6 +8,7 @@ import { useRooms } from '../../stores/rooms'
 import { useCustomers } from '../../stores/customers'
 import { useUi } from '../../stores/ui'
 import { money, dateKey, addDays, diffDays } from '../../utils/format'
+import MoneyInput from '../ui/MoneyInput.vue'
 
 /** preset: { roomId?, checkIn? } khi tạo mới · booking: khi sửa */
 const props = defineProps({ booking: Object, preset: Object })
@@ -65,7 +66,7 @@ function submit() {
         <CustomerPicker v-model="form.customerId" />
       </div>
       <div class="field"><label>Tên khách *</label><input class="input" v-model="form.guestName" /></div>
-      <div class="field"><label>Điện thoại</label><input class="input" v-model="form.phone" /></div>
+      <div class="field"><label>Điện thoại</label><input class="input" type="tel" inputmode="tel" autocomplete="tel" v-model="form.phone" /></div>
       <div class="field">
         <label>Phòng</label>
         <AppSelect
@@ -76,7 +77,7 @@ function submit() {
       <div class="field"><label>Số khách</label><input class="input" type="number" min="1" v-model="form.guests" /></div>
       <div class="field"><label>Ngày nhận phòng</label><AppDate v-model="form.checkIn" :disabled="booking?.status === 'staying'" /></div>
       <div class="field"><label>Ngày trả phòng</label><AppDate v-model="form.checkOut" :min="addDays(form.checkIn, 1)" /></div>
-      <div class="field"><label>Đặt cọc</label><input class="input num" type="number" min="0" step="50000" v-model="form.deposit" /></div>
+      <div class="field"><label>Đặt cọc</label><MoneyInput v-model="form.deposit" /></div>
       <div class="field"><label>Ghi chú</label><input class="input" v-model="form.note" placeholder="Giờ đến, yêu cầu đặc biệt..." /></div>
     </form>
 

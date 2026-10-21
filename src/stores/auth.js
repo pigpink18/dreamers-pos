@@ -138,13 +138,15 @@ export const useAuth = defineStore('auth', () => {
   }
   function saveUser(data) {
     const { pin, ...rest } = data
-    if (pin && pinTaken(pin, data.id)) throw new Error('Mã PIN này đã có người dùng, hãy chọn mã khác')
+    if (pin && pinTaken(pin, data.id)) throw new Error('Mã PIN này không dùng được, hãy chọn mã khác')
     if (data.id) {
       const u = userById(data.id)
       const before = { roleId: u.roleId, active: u.active }
+      const snapshot = { ...u }
       Object.assign(u, rest)
       if (pin) u.pinHash = hashPin(pin)
-      ensureOwner()
+      // không được hạ / khoá chủ quán cuối cùng -> trả lại như cũ
+      try { ensureOwner() } catch (e) { Object.keys(u).forEach((k) => delete u[k]); Object.assign(u, snapshot); throw e }
       useAudit().log('user.update', `Sửa người dùng ${u.name}` + (before.roleId !== u.roleId ? ` (vai trò: ${roleById(before.roleId)?.name} → ${roleById(u.roleId)?.name})` : '') + (pin ? ' · đổi PIN' : ''))
       return u
     }

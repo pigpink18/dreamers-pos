@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useRooms } from './rooms' // chỉ dùng bên trong hàm (tránh vòng lặp import)
 import { computed } from 'vue'
 import { useStorage } from '../utils/storage'
 import { uid } from '../utils/format'
@@ -44,7 +45,8 @@ export const useInvoices = defineStore('invoices', () => {
       subtotal,
       discount,
       total: subtotal - discount,
-      paid: data.paid ?? subtotal - discount,
+      // phòng đã đặt cọc: lúc trả phòng chỉ thu phần còn lại
+      paid: data.paid ?? Math.max(0, subtotal - discount - (+data.deposit || 0)),
       method: data.method || 'cash',
       note: data.note || '',
       bookingId: data.bookingId || null,
@@ -77,6 +79,17 @@ export const useInvoices = defineStore('invoices', () => {
     inv.cancelApprovedBy = approver && approver.id !== auth.user?.id ? approver.name : null
     useAudit().log('invoice.cancel', `${inv.code} · ${inv.total.toLocaleString('vi-VN')} ₫` + (reason ? ` · Lý do: ${reason}` : ''), { approvedBy: approver })
     inv.items.forEach((l) => l.productId && products.adjustStock(l.productId, l.qty))
+    // Huỷ hoá đơn tiền phòng -> lịch đặt trở lại "đang ở" để trả phòng / xuất hoá đơn lại (không mất tiền phòng)
+    if (inv.bookingId) {
+      const rooms = useRooms()
+      const b = rooms.bookingById(inv.bookingId)
+      if (b && b.status === 'checked_out' && b.invoiceId === inv.id) {
+        const busy = rooms.bookings.some((x) => x.id !== b.id && x.roomId === b.roomId && x.status === 'staying')
+        b.status = busy ? 'booked' : 'staying'
+        b.invoiceId = null
+        b.checkedOutAt = null
+      }
+    }
   }
 
   const ofCustomer = (customerId) => items.value.filter((i) => i.customerId === customerId)

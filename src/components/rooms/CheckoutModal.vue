@@ -11,6 +11,7 @@ import { useAudit } from '../../stores/audit'
 import { PAY_METHODS } from '../../stores/invoices'
 import VietQrCard from '../payment/VietQrCard.vue'
 import { money, number, fmtDate, dateKey } from '../../utils/format'
+import DiscountInput from '../ui/DiscountInput.vue'
 
 const props = defineProps({ bookingId: String })
 const emit = defineEmits(['close', 'done'])
@@ -31,6 +32,10 @@ function addExtra() {
   const p = products.byId(pickId.value)
   if (!p) return
   const ex = extras.value.find((e) => e.productId === p.id)
+  if (p.trackStock !== false && (ex?.qty || 0) + 1 > (+p.stock || 0)) {
+    setTimeout(() => (pickId.value = ''), 0)
+    return ui.toast(`"${p.name}" chỉ còn ${p.stock} ${p.unit}`, 'error')
+  }
   if (ex) ex.qty++
   else extras.value.push({ productId: p.id, name: p.name, price: p.price, cost: p.cost, qty: 1 })
   setTimeout(() => (pickId.value = ''), 0)
@@ -42,6 +47,12 @@ const total = computed(() => Math.max(0, roomCharge.value + extrasTotal.value - 
 const due = computed(() => total.value - (b.value.deposit || 0))
 
 async function confirm() {
+  // Số lượng dịch vụ: số nguyên, không vượt tồn kho
+  for (const e of extras.value) {
+    e.qty = Math.max(0, Math.floor(+e.qty || 0))
+    const p = products.byId(e.productId)
+    if (p && p.trackStock !== false && e.qty > (+p.stock || 0)) return ui.toast(`"${p.name}" chỉ còn ${p.stock} ${p.unit}`, 'error')
+  }
   // Thu tiền phòng cũng phải nằm trong một ca
   if (!(await ui.requireShift())) return
   // Giảm giá vượt mức cho phép -> cần duyệt
@@ -57,7 +68,9 @@ async function confirm() {
     if (!approver) return
     useAudit().log('invoice.discount', `Giảm ${money(disc)} (${pct}%) khi trả phòng ${room.value.name}`, { approvedBy: approver })
   }
-  const inv = rooms.checkOut(b.value.id, { extras: extras.value.filter((e) => e.qty > 0), discount: disc, method: method.value })
+  let inv
+  try { inv = rooms.checkOut(b.value.id, { extras: extras.value.filter((e) => e.qty > 0), discount: disc, method: method.value }) }
+  catch (e) { return ui.toast(e.message, 'error') }
   ui.toast(`Đã trả phòng ${room.value.name} · ${inv.code}`)
   emit('done', inv)
   emit('close')
@@ -83,7 +96,7 @@ async function confirm() {
           <td>
             <div class="flex">
               {{ e.name }}
-              <input class="input num" type="number" min="0" v-model.number="e.qty" style="width: 70px; height: 30px" />
+              <input class="input num" type="number" min="0" step="1" inputmode="numeric" v-model.number="e.qty" style="width: 70px; height: 30px" />
               <span class="muted">× {{ number(e.price) }}</span>
               <button class="btn btn--ghost btn--icon btn--sm" @click="extras.splice(i, 1)" aria-label="Bỏ"><Icon name="x" :size="14" /></button>
             </div>
@@ -101,10 +114,11 @@ async function confirm() {
     </div>
 
     <div class="co-sum">
-      <div class="row"><span>Giảm giá</span><input class="input num text-right" type="number" min="0" step="10000" v-model="discount" style="width: 140px" /></div>
+      <div class="row"><span>Giảm giá</span><DiscountInput v-model="discount" :base="roomCharge + extrasTotal" /></div>
       <div class="row"><span>Tổng cộng</span><b class="num">{{ money(total) }}</b></div>
       <div class="row" v-if="b.deposit"><span>Đã đặt cọc</span><b class="num text-success">− {{ money(b.deposit) }}</b></div>
-      <div class="row big"><span>Khách cần trả thêm</span><b class="num">{{ money(due) }}</b></div>
+      <div v-if="due >= 0" class="row big"><span>Khách cần trả thêm</span><b class="num">{{ money(due) }}</b></div>
+      <div v-else class="row big"><span>Hoàn lại khách (cọc dư)</span><b class="num text-danger">{{ money(-due) }}</b></div>
       <div class="segmented segmented--full">
         <button v-for="(l, k) in PAY_METHODS" :key="k" :class="{ active: method === k }" @click="method = k">{{ l }}</button>
       </div>

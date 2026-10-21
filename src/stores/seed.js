@@ -135,7 +135,16 @@ export const ROOMS = [
   ['Sương', 'Mist Room', 1, 680000, 2],
 ]
 
-/** App mới hoàn toàn: 2 tài khoản Yến (chủ quán), Lam (nhân viên) và menu thật; chưa có phòng, khách hay hoá đơn */
+/** Thêm 7 phòng Dreamers nếu máy chưa có phòng nào (chạy 1 lần, xoá phòng rồi thì không tự thêm lại) */
+export function ensureRooms() {
+  const key = 'dreamers:roomsVersion'
+  if (localStorage.getItem(key)) return
+  const rooms = useRooms()
+  if (!rooms.rooms.length) withoutAudit(() => ROOMS.forEach(([name, type, floor, price, capacity]) => rooms.saveRoom({ name, type, floor, price, capacity })))
+  localStorage.setItem(key, '1')
+}
+
+/** App mới hoàn toàn: 2 tài khoản Yến (chủ quán), Lam (nhân viên), menu thật và 7 phòng; chưa có khách hay hoá đơn */
 export function seedFresh() {
   withoutAudit(() => {
     const auth = useAuth()
@@ -146,6 +155,7 @@ export function seedFresh() {
   useSettings().ops.demo = false
   markSeeded()
   ensureMenu() // app mới có sẵn menu thật của Dreamers
+  ensureRooms() // và 7 phòng
 }
 
 /** Nạp toàn bộ dữ liệu mẫu (không ghi nhật ký trong lúc nạp) */

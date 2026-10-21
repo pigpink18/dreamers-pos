@@ -20,8 +20,11 @@ export const useSettings = defineStore('settings', () => {
   // Mặc định: MB Bank của Yến (BIN 970422). Đổi trong Cài đặt -> Thanh toán.
   const DEFAULT_PAYMENT = { bin: '970422', account: '0865665603', holder: '', qrOnReceipt: true }
   const payment = useStorage('payment', { ...DEFAULT_PAYMENT })
-  // Máy đang để trống tài khoản (bản cũ) -> điền tài khoản MB của Yến
-  if (!payment.value.account) Object.assign(payment.value, { bin: DEFAULT_PAYMENT.bin, account: DEFAULT_PAYMENT.account, qrOnReceipt: true })
+  // Máy đang để trống tài khoản (bản cũ) -> điền tài khoản MB của Yến, chỉ 1 lần (sau đó chủ quán xoá / đổi thì giữ nguyên)
+  if (!localStorage.getItem('dreamers:payDefault')) {
+    if (!payment.value.account) Object.assign(payment.value, { bin: DEFAULT_PAYMENT.bin, account: DEFAULT_PAYMENT.account, qrOnReceipt: true })
+    localStorage.setItem('dreamers:payDefault', '1')
+  }
   /** Hoá đơn điện tử */
   const einvoice = useStorage('einvoice', {
     provider: 'none', // none | sandbox | misa | viettel | vnpt

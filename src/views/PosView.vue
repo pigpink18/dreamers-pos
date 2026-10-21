@@ -11,6 +11,8 @@ import CustomerPicker from '../components/customers/CustomerPicker.vue'
 import InvoiceDetailModal from '../components/invoices/InvoiceDetailModal.vue'
 import ProductFormModal from '../components/products/ProductFormModal.vue'
 import VietQrCard from '../components/payment/VietQrCard.vue'
+import MoneyInput from '../components/ui/MoneyInput.vue'
+import DiscountInput from '../components/ui/DiscountInput.vue'
 import { useSettings } from '../stores/settings'
 import { useProducts } from '../stores/products'
 import { useInvoices, PAY_METHODS } from '../stores/invoices'
@@ -60,10 +62,11 @@ const list = computed(() => {
 })
 
 // ---------- Các tab hoá đơn (lưu lại để F5 không mất giỏ) ----------
-const newCart = (n) => ({ id: Date.now() + n, label: `Hoá đơn ${n}`, lines: [], customerId: null, discount: 0, method: 'cash', given: null, note: '' })
+const newCart = (n) => ({ id: Date.now() + n, label: `Hoá đơn ${n}`, lines: [], customerId: null, discount: 0, discPct: null, method: 'cash', given: null, note: '' })
 const carts = useStorage('pos-carts', [newCart(1)])
 const activeIdx = useStorage('pos-active', 0)
 if (!carts.value[activeIdx.value]) activeIdx.value = 0
+carts.value.forEach((c) => { if (c.discPct === undefined) c.discPct = null }) // giỏ lưu từ bản cũ
 const cart = computed(() => carts.value[activeIdx.value])
 
 function addTab() {
@@ -80,13 +83,18 @@ async function closeTab(i) {
 
 // ---------- Giỏ hàng ----------
 const inCart = (pid) => cart.value.lines.find((l) => l.productId === pid)?.qty || 0
+/** Số lượng món này đang nằm ở CÁC HOÁ ĐƠN KHÁC (tab khác) -> không bán vượt tồn kho khi mở nhiều tab */
+const heldElsewhere = (pid) => carts.value.reduce((s, c) => (c === cart.value ? s : s + (c.lines.find((l) => l.productId === pid)?.qty || 0)), 0)
+const available = (p) => Math.max(0, (+p.stock || 0) - heldElsewhere(p.id))
+const tracked = (p) => p && p.trackStock !== false
 
 function add(p, e) {
   const line = cart.value.lines.find((l) => l.productId === p.id)
   const want = (line?.qty || 0) + 1
-  if (p.trackStock !== false && want > p.stock) {
+  if (tracked(p) && want > available(p)) {
     e?.currentTarget?.animate?.([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], { duration: 300 })
-    return ui.toast(`"${p.name}" chỉ còn ${p.stock} ${p.unit}`, 'error')
+    const held = heldElsewhere(p.id)
+    return ui.toast(`"${p.name}" chỉ còn ${p.stock} ${p.unit}` + (held ? ` (${held} đang ở hoá đơn khác)` : ''), 'error')
   }
   if (line) line.qty++
   else cart.value.lines.push({ productId: p.id, name: p.name, price: p.price, cost: p.cost, qty: 1, unit: p.unit })
@@ -101,9 +109,10 @@ function add(p, e) {
 function setQty(line, qty) {
   const p = products.byId(line.productId)
   qty = Math.max(0, Math.floor(+qty || 0))
-  if (p && p.trackStock !== false && qty > p.stock) {
-    ui.toast(`Chỉ còn ${p.stock} ${p.unit}`, 'error')
-    qty = p.stock
+  if (tracked(p) && qty > available(p)) {
+    const held = heldElsewhere(p.id)
+    ui.toast(`Chỉ còn ${p.stock} ${p.unit}` + (held ? ` (${held} đang ở hoá đơn khác)` : ''), 'error')
+    qty = available(p)
   }
   if (qty === 0) cart.value.lines = cart.value.lines.filter((l) => l !== line)
   else line.qty = qty
@@ -138,7 +147,15 @@ async function checkout() {
   if (paying) return
   if (!cart.value.lines.length) return ui.toast('Chưa có hàng trong hoá đơn', 'error')
   if (cart.value.method === 'cash' && given.value < total.value) return ui.toast('Khách đưa chưa đủ tiền', 'error')
+  // Kiểm tra lần cuối: không bán vượt tồn kho (VD đã bán món này ở tab khác)
+  for (const l of cart.value.lines) {
+    const p = products.byId(l.productId)
+    if (tracked(p) && l.qty > p.stock) return ui.toast(`"${p.name}" chỉ còn ${p.stock} ${p.unit} — sửa số lượng trước khi thanh toán`, 'error')
+  }
   paying = true
+  // Chụp lại hoá đơn lúc bấm thanh toán: trong lúc chờ mở ca / quản lý duyệt mà hoá đơn bị sửa thì dừng lại
+  const snap = () => JSON.stringify([cart.value.id, cart.value.lines.map((l) => [l.productId, l.qty, l.price]), discount.value, cart.value.method])
+  const before = snap()
   try {
     // 1) Phải có ca đang mở (nếu cửa hàng bật quy tắc này)
     if (!(await ui.requireShift())) return
@@ -152,8 +169,10 @@ async function checkout() {
         check: (u) => (auth.roleById(u.roleId)?.maxDiscount ?? 0) >= pct,
       })
       if (!approver) return
+      if (snap() !== before) return ui.toast('Hoá đơn vừa thay đổi trong lúc chờ duyệt — kiểm tra lại rồi bấm Thanh toán', 'error')
       audit.log('invoice.discount', `Giảm ${money(discount.value)} (${pct}%) trên hoá đơn ${money(subtotal.value)}`, { approvedBy: approver })
     }
+    if (snap() !== before) return ui.toast('Hoá đơn vừa thay đổi — kiểm tra lại rồi bấm Thanh toán', 'error')
     doCheckout(approver)
   } finally {
     paying = false
@@ -174,7 +193,7 @@ function doCheckout(approver) {
   })
   ui.toast(`Thanh toán thành công ${inv.code}`)
   // Reset tab hiện tại
-  Object.assign(cart.value, { lines: [], customerId: null, discount: 0, given: null, note: '', method: 'cash' })
+  Object.assign(cart.value, { lines: [], customerId: null, discount: 0, discPct: null, given: null, note: '', method: 'cash' })
   printedId.value = inv.id
   cartOpen.value = false
 }
@@ -192,7 +211,8 @@ function onSearchEnter() {
 }
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  nextTick(() => searchEl.value?.focus())
+  // điện thoại: không tự bật bàn phím che mất danh sách món
+  if (!window.matchMedia('(max-width: 760px)').matches) nextTick(() => searchEl.value?.focus())
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
@@ -252,7 +272,10 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
     <div v-if="cartOpen" class="cart-scrim" @click="cartOpen = false"></div>
 
     <section class="pos__cart" :class="{ open: cartOpen }">
-      <div class="sheet-grabber" @click="cartOpen = false"></div>
+      <div class="sheet-head">
+        <div class="sheet-grabber" @click="cartOpen = false"></div>
+        <button class="sheet-close" aria-label="Đóng giỏ hàng" @click="cartOpen = false"><Icon name="x" :size="18" /></button>
+      </div>
       <div class="tabs">
         <div v-for="(c, i) in carts" :key="c.id" class="tab" :class="{ active: i === activeIdx }" @click="activeIdx = i">
           {{ c.label }}<span v-if="c.lines.length" class="tab__count">{{ c.lines.length }}</span>
@@ -276,7 +299,7 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
           </div>
           <div class="stepper">
             <button @click="setQty(l, l.qty - 1)" aria-label="Giảm"><Icon name="minus" :size="14" /></button>
-            <input :value="l.qty" @change="setQty(l, $event.target.value)" class="num" />
+            <input :value="l.qty" @change="setQty(l, $event.target.value)" class="num" inputmode="numeric" aria-label="Số lượng" />
             <button @click="setQty(l, l.qty + 1)" aria-label="Tăng"><Icon name="plus" :size="14" /></button>
           </div>
           <div class="line__total num">{{ number(l.price * l.qty) }}</div>
@@ -292,7 +315,7 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
               {{ Math.round(discountPct) }}%<template v-if="overLimit"> · cần duyệt</template>
             </small>
           </span>
-          <input class="input input--sm num text-right" type="number" min="0" step="1000" v-model.number="cart.discount" style="width: 130px" />
+          <DiscountInput v-model="cart.discount" v-model:pct="cart.discPct" :base="subtotal" />
         </div>
         <div class="row row--total"><span>Khách cần trả</span><b class="num">{{ money(total) }}</b></div>
 
@@ -303,7 +326,7 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
         <template v-if="cart.method === 'cash'">
           <div class="row">
             <span>Khách đưa</span>
-            <input class="input input--sm num text-right" type="number" min="0" :placeholder="number(total)" v-model="cart.given" style="width: 130px" />
+            <MoneyInput class="input--sm text-right" nullable :placeholder="number(total)" v-model="cart.given" style="width: 130px" />
           </div>
           <div class="quick">
             <button v-for="s in suggestions" :key="s" class="chip" @click="cart.given = s">{{ number(s) }}</button>
@@ -314,9 +337,11 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
         <VietQrCard v-if="cart.method === 'transfer' && total > 0" :amount="total" :note="`${nextInvoiceCode} Dreamers`" :size="132" class="pos-qr" />
 
         <input class="input input--sm" v-model="cart.note" placeholder="Ghi chú hoá đơn..." />
-
+      </div>
+      <!-- Nút thanh toán tách riêng: trên điện thoại luôn dính ở đáy tấm giỏ hàng -->
+      <div class="cart__pay">
         <button class="btn btn--primary btn--lg btn--block" :disabled="!cart.lines.length" @click="checkout">
-          Thanh toán (F9) · {{ money(total) }}
+          Thanh toán<span class="hide-mobile"> (F9)</span> · {{ money(total) }}
         </button>
       </div>
     </section>
@@ -425,15 +450,16 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
   button { width: 28px; height: 26px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; display: grid; place-items: center; color: $text; &:active { background: $surface; } }
   input { width: 30px; height: 26px; border: 0; background: transparent; text-align: center; font: inherit; font-weight: 600; color: $text; &:focus { outline: none; } }
 }
+.cart__pay { flex-shrink: 0; padding: 0 16px 16px; background: $surface-2; }
 .cart__summary {
-  padding: 14px 16px 16px; border-top: 1px solid $border; display: flex; flex-direction: column; gap: 10px; background: $surface-2;
+  padding: 14px 16px 12px; border-top: 1px solid $border; display: flex; flex-direction: column; gap: 10px; background: $surface-2;
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .row--total { padding: 2px 0; span { font-weight: 600; } b { font-family: $font-display; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; } }
   .quick { display: flex; gap: 6px; flex-wrap: wrap; .chip { height: 28px; font-size: 12px; padding: 0 10px; } }
 }
 .segmented--full { display: flex; button { flex: 1; } }
 .disc-tag { margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: $fill; color: $text-2; &.warn { background: $warning-soft; color: $warning; } }
-.sheet-grabber, .cartbar, .cart-scrim { display: none; }
+.sheet-head, .sheet-grabber, .cartbar, .cart-scrim { display: none; }
 
 @media (max-width: 1200px) { .pos { grid-template-columns: 1fr 360px; } }
 @include tablet { .pos { padding: 0 16px 16px; } }
@@ -462,6 +488,35 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
     padding-bottom: var(--safe-bottom);
     &.open { transform: none; }
   }
-  .sheet-grabber { display: block; flex-shrink: 0; width: 36px; height: 5px; border-radius: 3px; background: rgba(0,0,0,.18); margin: 8px auto 0; }
+  // Tấm giỏ hàng cuộn được cả khối (danh sách món + phần tính tiền), nút Thanh toán luôn dính ở đáy
+  .pos__cart.open { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .pos__cart .cart__lines { flex: none; overflow: visible; min-height: 0; }
+  .pos__cart .cart__empty { height: auto; }
+  .pos__cart .cart__summary { flex-shrink: 0; }
+  .cart__pay { position: sticky; bottom: 0; z-index: 2; padding: 10px 16px calc(12px + var(--safe-bottom)); border-top: 1px solid $border; }
+  .pos__cart { padding-bottom: 0; }
+  .sheet-head { display: block; position: sticky; top: 0; z-index: 3; height: 28px; background: inherit; flex-shrink: 0; }
+  .sheet-grabber { display: block; width: 36px; height: 5px; border-radius: 3px; background: rgba(0,0,0,.18); margin: 8px auto 0; cursor: pointer; }
+  .sheet-close {
+    position: absolute; right: 10px; top: 4px; width: 36px; height: 36px; border: 0; border-radius: 50%;
+    display: grid; place-items: center; background: $fill; color: $text-2; cursor: pointer;
+  }
+  .cart-scrim { cursor: pointer; }
+  // Nút to hơn cho ngón tay
+  .stepper { button { width: 38px; height: 36px; } input { width: 34px; height: 36px; } }
+  .line__del { padding: 9px; }
+  // Dòng món 2 tầng: tên + giá ở trên (đủ rộng), bộ tăng giảm + thành tiền + xoá ở dưới
+  .line {
+    display: grid; grid-template-columns: 18px auto 1fr auto; grid-template-areas: 'idx info info info' '. step total del';
+    column-gap: 8px; row-gap: 6px; padding: 12px 6px;
+  }
+  .line__idx { grid-area: idx; align-self: start; padding-top: 2px; }
+  .line__info { grid-area: info; }
+  .line__name { white-space: normal; overflow: visible; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .line .stepper { grid-area: step; }
+  .line__total { grid-area: total; width: auto; font-size: 15px; }
+  .line__del { grid-area: del; }
+  .tabs { padding-right: 52px; .tab { height: 36px; } .tab__x { padding: 7px; } }
+  .cart__summary .quick .chip { height: 34px; font-size: 13px; }
 }
 </style>

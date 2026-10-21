@@ -9,6 +9,7 @@ import { useProducts } from '../stores/products'
 import { useUi } from '../stores/ui'
 import { useAuth } from '../stores/auth'
 import { money, number, fmtDateTime, normalize } from '../utils/format'
+import MoneyInput from '../components/ui/MoneyInput.vue'
 
 const products = useProducts()
 const ui = useUi()
@@ -156,8 +157,8 @@ function saveImport() {
                 :options="stockable.map((p) => ({ value: p.id, label: p.name, sub: 'tồn ' + p.stock }))"
               />
             </td>
-            <td><input class="input num" type="number" min="1" v-model="l.qty" /></td>
-            <td><input class="input num" type="number" min="0" step="1000" v-model="l.cost" /></td>
+            <td><input class="input num" type="number" min="1" step="1" inputmode="numeric" v-model="l.qty" /></td>
+            <td><MoneyInput v-model="l.cost" /></td>
             <td class="text-right num fw-600">{{ number((+l.qty || 0) * (+l.cost || 0)) }}</td>
             <td><button class="btn btn--ghost btn--icon btn--sm" @click="importing.lines.splice(i, 1)" aria-label="Xoá dòng"><Icon name="x" :size="14" /></button></td>
           </tr>

@@ -48,7 +48,7 @@ function choose(c) {
         </div>
       </div>
     </div>
-    <CustomerFormModal v-if="showAdd" :preset-name="q" @close="showAdd = false" @saved="(id) => { model = id; q = '' }" />
+    <CustomerFormModal v-if="showAdd" :preset-name="/^[\d\s+.\-]+$/.test(q) ? '' : q" :preset-phone="/^[\d\s+.\-]+$/.test(q) ? q : ''" @close="showAdd = false" @saved="(id) => { model = id; q = '' }" />
   </div>
 </template>
 

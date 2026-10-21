@@ -64,3 +64,13 @@ export function download(filename, content, type = 'text/csv;charset=utf-8') {
 /** Bỏ dấu tiếng Việt để tìm kiếm: "Cà phê" -> "ca phe" */
 export const normalize = (s = '') =>
   s.toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+
+/** Chuẩn hoá số điện thoại: bỏ khoảng trắng / chấm / gạch, +84 -> 0. VD "+84 901 234 567" -> "0901234567" */
+export function normalizePhone(s) {
+  let p = String(s || '').trim().replace(/[\s.\-()]/g, '')
+  if (p.startsWith('+84')) p = '0' + p.slice(3)
+  else if (p.startsWith('84') && p.length === 11) p = '0' + p.slice(2)
+  return p
+}
+/** Số hợp lệ: 8–15 chữ số (có thể bắt đầu bằng + cho số nước ngoài) */
+export const isValidPhone = (s) => /^\+?\d{8,15}$/.test(normalizePhone(s))

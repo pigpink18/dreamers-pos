@@ -99,6 +99,9 @@ export const useRooms = defineStore('rooms', () => {
 
   function checkIn(id) {
     const b = bookingById(id)
+    // Phòng đang có khách khác ở -> phải trả phòng cho khách đó trước
+    const other = bookings.value.find((x) => x.id !== b.id && x.roomId === b.roomId && x.status === 'staying')
+    if (other) throw new Error(`Phòng ${roomById(b.roomId)?.name} đang có khách ${other.guestName} — trả phòng cho khách đó trước`)
     b.status = 'staying'
     b.checkedInAt = new Date().toISOString()
     // Nhận sớm hơn ngày đặt -> dời ngày nhận về hôm nay
@@ -119,6 +122,12 @@ export const useRooms = defineStore('rooms', () => {
     const room = roomById(b.roomId)
     const today = dateKey()
     const nights = nightsFor(b, today)
+    // Trả phòng muộn hơn lịch: không được kéo dài đè lên lịch của khách sau
+    const newOut = today > b.checkIn ? today : addDays(b.checkIn, 1)
+    if (newOut > b.checkOut) {
+      const c = findConflict({ roomId: b.roomId, checkIn: b.checkOut, checkOut: newOut, id: b.id })
+      if (c) throw new Error(`Trả phòng muộn sẽ trùng lịch ${c.code} (${c.guestName}) — sửa lại lịch rồi trả phòng`)
+    }
     const items = [
       { name: `Phòng ${room.name} (${room.type}) × ${nights} đêm`, price: room.price, cost: 0, qty: nights },
       ...extras,
@@ -136,7 +145,7 @@ export const useRooms = defineStore('rooms', () => {
     })
     b.status = 'checked_out'
     b.checkedOutAt = new Date().toISOString()
-    b.checkOut = today > b.checkIn ? today : addDays(b.checkIn, 1)
+    b.checkOut = newOut
     b.invoiceId = inv.id
     room.housekeeping = 'dirty'
     useAudit().log('room.checkout', `${b.guestName} trả phòng ${room.name} · ${inv.code}`)
@@ -171,7 +180,9 @@ export const useRooms = defineStore('rooms', () => {
   function removeRoom(id) {
     if (bookings.value.some((b) => b.roomId === id && ['booked', 'staying'].includes(b.status)))
       throw new Error('Phòng đang có khách hoặc lịch đặt, không thể xoá')
-    rooms.value = rooms.value.filter((r) => r.id !== id)
+    const r = roomById(id)
+    rooms.value = rooms.value.filter((x) => x.id !== id)
+    useAudit().log('room.update', `Xoá phòng ${r?.name || ''}`)
   }
 
   return {

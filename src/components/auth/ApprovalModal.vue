@@ -27,7 +27,7 @@ function onPin(pin) {
 
 <template>
   <Teleport to="body">
-    <div v-if="ui.approvalState" class="modal-backdrop modal-backdrop--top alert-backdrop" @mousedown.self="ui.closeApproval(null)">
+    <div v-if="ui.approvalState" class="modal-backdrop modal-backdrop--top alert-backdrop" @click.self="ui.closeApproval(null)">
       <div class="approval">
         <div class="approval__icon"><Icon name="fa-user-shield" :size="26" /></div>
         <h3>Cần quản lý duyệt</h3>

@@ -30,9 +30,11 @@ export const useProducts = defineStore('products', () => {
     if (data.id) {
       const p = byId(data.id)
       const oldPrice = p.price
+      const oldStock = p.stock
       Object.assign(p, data)
-      if (oldPrice !== p.price) useAudit().log('product.price', `${p.name}: ${oldPrice.toLocaleString('vi-VN')} → ${p.price.toLocaleString('vi-VN')} ₫`)
-      else useAudit().log('product.update', `Sửa ${p.name}`)
+      const stockNote = p.trackStock !== false && oldStock !== p.stock ? ` · tồn kho ${oldStock ?? 0} → ${p.stock}` : ''
+      if (oldPrice !== p.price) useAudit().log('product.price', `${p.name}: ${oldPrice.toLocaleString('vi-VN')} → ${p.price.toLocaleString('vi-VN')} ₫` + stockNote)
+      else useAudit().log('product.update', `Sửa ${p.name}` + stockNote)
       return data.id
     }
     const p = { trackStock: true, minStock: 5, active: true, ...data, id: uid(), code: data.code || settings.nextCode('SP') }
@@ -61,7 +63,7 @@ export const useProducts = defineStore('products', () => {
       date,
       supplier,
       note,
-      items: lines.map((l) => ({ productId: l.productId, name: byId(l.productId)?.name, qty: +l.qty, cost: +l.cost })),
+      items: lines.map((l) => ({ productId: l.productId, name: byId(l.productId)?.name, qty: Math.max(0, Math.round(+l.qty || 0)), cost: Math.max(0, Math.round(+l.cost || 0)) })).filter((l) => l.qty > 0),
     }
     rec.total = rec.items.reduce((s, l) => s + l.qty * l.cost, 0)
     rec.items.forEach((l) => {

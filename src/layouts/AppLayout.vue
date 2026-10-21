@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Icon from '../components/ui/Icon.vue'
+import { lockScroll, unlockScroll } from '../utils/scrollLock'
 import ShiftOpenModal from '../components/shifts/ShiftOpenModal.vue'
 import ShiftCloseModal from '../components/shifts/ShiftCloseModal.vue'
 import { useUi } from '../stores/ui'
@@ -58,6 +59,12 @@ watch(() => route.name, (to, from) => {
 // ---- Menu người dùng ----
 const userMenu = ref(false)
 const openGroup = ref(null) // menu ngang: nhóm đang mở
+// Esc đóng bảng Thêm
+const onMoreKey = (e) => e.key === 'Escape' && (moreOpen.value = false)
+watch(moreOpen, (v) => {
+  if (v) { window.addEventListener('keydown', onMoreKey); lockScroll() }
+  else { window.removeEventListener('keydown', onMoreKey); unlockScroll() }
+})
 watch(() => route.path, () => { moreOpen.value = false; userMenu.value = false; openGroup.value = null })
 const roleName = computed(() => auth.role?.name || '')
 const roleColor = computed(() => auth.role?.color || 'var(--primary)')
@@ -231,16 +238,20 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
     </nav>
 
     <Teleport to="body">
-      <div v-if="moreOpen" class="modal-backdrop" @click.self="moreOpen = false">
-        <div class="modal more-sheet">
-          <header class="modal__header"><h3>Thêm</h3></header>
+      <!-- Bảng "Thêm" trên điện thoại. Chạm ra ngoài, nút X, hoặc chọn mục nào cũng đóng bảng (iOS cần cursor:pointer để nhận chạm) -->
+      <div v-if="moreOpen" class="modal-backdrop more-backdrop" @click.self="moreOpen = false">
+        <div class="modal more-sheet" role="dialog" aria-modal="true" aria-label="Thêm">
+          <header class="modal__header">
+            <h3>Thêm</h3>
+            <button class="btn btn--ghost btn--icon btn--sm modal__close" aria-label="Đóng" @click="moreOpen = false"><Icon name="x" :size="16" /></button>
+          </header>
           <div class="more-sheet__list">
-            <RouterLink v-for="r in moreRoutes" :key="r.name" :to="r.path" class="more-sheet__item">
+            <RouterLink v-for="r in moreRoutes" :key="r.name" :to="r.path" class="more-sheet__item" @click="moreOpen = false">
               <span class="more-sheet__icon"><Icon :name="r.meta.icon" :size="18" /></span>
               <span>{{ r.meta.title }}</span>
               <Icon name="right" :size="14" class="muted" style="margin-left: auto" />
             </RouterLink>
-            <button class="more-sheet__item" @click="lockScreen">
+            <button class="more-sheet__item" @click="moreOpen = false; lockScreen()">
               <span class="more-sheet__icon"><Icon name="fa-lock" :size="18" /></span><span>Khoá màn hình / đổi người</span>
             </button>
           </div>
@@ -262,7 +273,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
 
     <!-- Hộp xác nhận kiểu alert của macOS/iOS -->
     <Teleport to="body">
-      <div v-if="ui.confirmState" class="modal-backdrop modal-backdrop--top alert-backdrop" @mousedown.self="ui.closeConfirm(false)">
+      <div v-if="ui.confirmState" class="modal-backdrop modal-backdrop--top alert-backdrop" @click.self="ui.closeConfirm(false)">
         <div class="alert">
           <h3>{{ ui.confirmState.title }}</h3>
           <p>{{ ui.confirmState.message }}</p>
@@ -435,11 +446,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
 // ---------- Tab bar ----------
 .tabbar { display: none; }
 .more-sheet { max-width: 420px; }
-.more-sheet__list { padding: 8px 12px 16px; }
+.more-sheet__list { padding: 8px 12px calc(16px + var(--safe-bottom)); overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
 .more-sheet__item {
   display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 8px; color: $text; font: inherit; font-size: 16px;
   border: 0; background: transparent; border-radius: 10px; cursor: pointer; text-align: left;
-  & + & { border-top: 1px solid $border; }
+  & + & { border-top: 1px solid $border; border-radius: 0; }
   &:active { background: $fill; }
 }
 .more-sheet__icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: $primary-soft; color: $primary; }

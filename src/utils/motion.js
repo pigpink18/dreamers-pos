@@ -24,15 +24,19 @@ export function installRipple() {
     if (!el || el.disabled || el.closest('[data-no-ripple]')) return
     const r = el.getBoundingClientRect()
     const size = Math.max(r.width, r.height) * 2.2
+    // Gợn sóng nằm trong 1 lớp bọc riêng (cắt theo bo góc của nút).
+    // KHÔNG đổi overflow của chính nút: đổi overflow làm nút co lại, nhảy chỗ ngay lúc chạm -> bấm trượt (lỗi trên iPhone).
+    const wrap = document.createElement('span')
+    wrap.className = 'ripple-wrap'
     const dot = document.createElement('span')
     dot.className = 'ripple'
     dot.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`
-    // phần tử cần position + overflow để chứa gợn sóng
-    const cs = getComputedStyle(el)
-    if (cs.position === 'static') el.style.position = 'relative'
-    if (cs.overflow === 'visible' && el.tagName !== 'TR') el.style.overflow = 'hidden'
-    el.appendChild(dot)
-    dot.addEventListener('animationend', () => dot.remove())
+    wrap.appendChild(dot)
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative' // chỉ đổi position, không ảnh hưởng kích thước
+    el.appendChild(wrap)
+    const done = () => wrap.remove()
+    dot.addEventListener('animationend', done)
+    setTimeout(done, 900) // phòng khi animationend không chạy (tab ẩn, tắt hiệu ứng)
   }, { passive: true })
 }
 
