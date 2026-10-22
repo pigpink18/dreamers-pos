@@ -170,147 +170,306 @@ async function logout() {
 }
 
 const email = computed(() => session.value?.user?.email || '')
+const initial = computed(() => (email.value[0] || '?').toUpperCase())
+const showPw = ref(false)
+
+// Màn đang hiện + tiêu đề (kiểu trang Apple ID: 1 cột, tiêu đề lớn, ít chữ)
+const view = computed(() => {
+  if (!configured.value) return 'server'
+  if (loading.value) return 'loading'
+  if (!session.value) return 'auth'
+  return creating.value || !shops.value.length ? 'create' : 'shops'
+})
+const heading = computed(() => ({
+  server: ['Cài máy chủ', 'Nhập địa chỉ và khoá công khai của dự án Supabase.'],
+  loading: ['Dreamers POS', ''],
+  auth: mode.value === 'signin'
+    ? ['Đăng nhập', 'Dùng tài khoản chủ quán để mở quán trên máy này.']
+    : ['Tạo tài khoản', 'Mỗi quán có dữ liệu riêng: menu, phòng, hoá đơn, nhân viên.'],
+  shops: ['Chọn quán', 'Chọn quán để mở trên máy này.'],
+  create: ['Tạo quán mới', 'Vài thông tin cơ bản, có thể sửa lại trong Cài đặt.'],
+})[view.value])
+function switchMode() {
+  mode.value = mode.value === 'signin' ? 'signup' : 'signin'
+  cred.password = cred.password2 = ''
+}
 </script>
 
 <template>
   <div class="acct">
-    <div class="acct__card">
-      <header class="acct__head">
-        <img :src="logo" alt="" class="acct__logo" />
-        <div>
-          <h1>{{ session ? 'Quán của bạn' : 'Tài khoản chủ quán' }}</h1>
-          <p class="muted">Mỗi quán có dữ liệu riêng: menu, phòng, hoá đơn, nhân viên.</p>
-        </div>
+    <main class="acct__wrap">
+      <!-- Biểu tượng app + tiêu đề -->
+      <header class="acct__brand">
+        <div class="acct__icon"><img :src="logo" alt="Dreamers POS" /></div>
+        <p class="acct__eyebrow">Dreamers POS</p>
+        <h1>{{ heading[0] }}</h1>
+        <p v-if="heading[1]" class="acct__lead">{{ heading[1] }}</p>
       </header>
 
-      <!-- Lỗi mở quán -->
+      <!-- Thông báo trạng thái -->
       <div v-if="boot.state === 'error'" class="acct__note acct__note--warn">
         <Icon name="fa-wifi-slash" :size="16" />
         <span>Không tải được dữ liệu quán {{ activeShop?.name }}: {{ boot.error }}. Lần đầu mở quán trên máy này cần có mạng.</span>
-        <button class="btn btn--sm btn--primary" @click="reopen">Thử lại</button>
+        <button class="acct__link" @click="reopen">Thử lại</button>
       </div>
+      <div v-if="view === 'auth' && boot.state === 'needSession'" class="acct__note">
+        <Icon name="fa-store" :size="16" /><span>Đăng nhập tài khoản chủ quán để mở <b>{{ activeShop?.name }}</b> trên máy này.</span>
+      </div>
+      <p v-if="err && view !== 'auth'" class="acct__note acct__note--warn"><Icon name="fa-triangle-exclamation" :size="16" /><span>{{ err }}</span></p>
 
-      <!-- Chưa cài máy chủ -->
-      <section v-if="!configured" class="acct__sec">
-        <div class="acct__note"><Icon name="fa-server" :size="16" /><span>Bản app này chưa cài máy chủ. Nhập địa chỉ và khoá công khai của dự án Supabase (Project Settings › API).</span></div>
-        <div class="field"><label>Địa chỉ máy chủ (Project URL)</label><input class="input" v-model="server.url" placeholder="https://xxxx.supabase.co" autocomplete="off" /></div>
-        <div class="field"><label>Khoá công khai (anon public key)</label><input class="input" v-model="server.key" placeholder="eyJhbGciOi..." autocomplete="off" /></div>
-        <button class="btn btn--primary btn--block" @click="saveServer">Lưu máy chủ</button>
-      </section>
-
-      <div v-else-if="loading" class="acct__loading"><span class="spin"></span> Đang tải…</div>
-
-      <!-- Đăng nhập / đăng ký -->
-      <section v-if="configured && !loading && !session" class="acct__sec">
-        <div v-if="boot.state === 'needSession'" class="acct__note">
-          <Icon name="fa-store" :size="16" /><span>Đăng nhập tài khoản chủ quán để mở <b>{{ activeShop?.name }}</b> trên máy này.</span>
-        </div>
-        <div class="segmented segmented--full acct__tabs">
-          <button :class="{ active: mode === 'signin' }" @click="mode = 'signin'">Đăng nhập</button>
-          <button :class="{ active: mode === 'signup' }" @click="mode = 'signup'">Đăng ký quán mới</button>
-        </div>
-        <form class="acct__form" @submit.prevent="submitCred">
-          <div class="field"><label>Email</label><input class="input" type="email" v-model="cred.email" autocomplete="email" inputmode="email" /></div>
-          <div class="field"><label>Mật khẩu</label><input class="input" type="password" v-model="cred.password" :autocomplete="mode === 'signin' ? 'current-password' : 'new-password'" /></div>
-          <div v-if="mode === 'signup'" class="field"><label>Nhập lại mật khẩu</label><input class="input" type="password" v-model="cred.password2" autocomplete="new-password" /></div>
-          <button class="btn btn--primary btn--lg btn--block" :disabled="busy">{{ mode === 'signin' ? 'Đăng nhập' : 'Tạo tài khoản' }}</button>
+      <Transition name="acct-step" mode="out-in">
+        <!-- Chưa cài máy chủ -->
+        <form v-if="view === 'server'" key="server" class="acct__form" @submit.prevent="saveServer">
+          <div class="ios-group">
+            <label class="ios-field"><span>Project URL</span><input v-model="server.url" name="url" placeholder="https://xxxx.supabase.co" autocomplete="off" /></label>
+            <label class="ios-field"><span>Khoá công khai (anon / publishable)</span><input v-model="server.key" name="key" placeholder="sb_publishable_… hoặc eyJ…" autocomplete="off" /></label>
+          </div>
+          <p class="acct__foot-note">Lấy trong Supabase › Connect. Không dùng khoá service_role / secret.</p>
+          <button class="btn btn--primary acct__cta">Lưu máy chủ</button>
         </form>
-        <p class="muted acct__small">Tài khoản này dành cho <b>chủ quán</b> (đăng nhập 1 lần trên mỗi máy của quán). Nhân viên vẫn vào ca bằng mã PIN.</p>
-      </section>
 
-      <!-- Đã đăng nhập: danh sách quán -->
-      <section v-if="configured && !loading && session" class="acct__sec">
-        <p v-if="err" class="acct__note acct__note--warn"><Icon name="fa-triangle-exclamation" :size="16" /><span>{{ err }}</span></p>
+        <div v-else-if="view === 'loading'" key="loading" class="acct__loading"><span class="spin"></span></div>
 
-        <div v-if="shops.length && !creating" class="shop-list">
-          <button v-for="s in shops" :key="s.id" class="shop-item" :class="{ active: s.id === activeShopId }" @click="open(s)">
-            <span class="shop-item__icon"><Icon name="fa-store" :size="18" /></span>
-            <span class="shop-item__txt"><b>{{ s.name }}</b><small>{{ s.id === activeShopId ? 'Đang mở trên máy này' : 'Bấm để mở trên máy này' }}</small></span>
-            <Icon name="right" :size="16" />
+        <!-- Đăng nhập / đăng ký -->
+        <form v-else-if="view === 'auth'" :key="'auth-' + mode" class="acct__form" @submit.prevent="submitCred" novalidate>
+          <div class="ios-group">
+            <label class="ios-field">
+              <span>Email</span>
+              <input v-model="cred.email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="ten@quancuaban.vn" autocapitalize="off" spellcheck="false" />
+            </label>
+            <label class="ios-field ios-field--pw">
+              <span>Mật khẩu</span>
+              <input v-model="cred.password" name="password" :type="showPw ? 'text' : 'password'" :autocomplete="mode === 'signin' ? 'current-password' : 'new-password'" :placeholder="mode === 'signup' ? 'Ít nhất 6 ký tự' : ''" />
+              <button type="button" class="ios-field__eye" :aria-label="showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" @click="showPw = !showPw"><Icon :name="showPw ? 'fa-eye-slash' : 'fa-eye'" :size="16" /></button>
+            </label>
+            <label v-if="mode === 'signup'" class="ios-field">
+              <span>Nhập lại mật khẩu</span>
+              <input v-model="cred.password2" name="password2" :type="showPw ? 'text' : 'password'" autocomplete="new-password" />
+            </label>
+          </div>
+          <button class="btn btn--primary acct__cta" :disabled="busy">
+            <span v-if="busy" class="spin spin--light"></span>{{ mode === 'signin' ? 'Đăng nhập' : 'Tạo tài khoản' }}
           </button>
-        </div>
-        <button v-if="!creating" class="btn btn--ghost btn--block" @click="creating = true"><Icon name="plus" :size="15" />Tạo quán mới</button>
+          <p class="acct-switch">
+            {{ mode === 'signin' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?' }}
+            <button type="button" class="acct__link" @click="switchMode">{{ mode === 'signin' ? 'Đăng ký quán mới' : 'Đăng nhập' }}</button>
+          </p>
+        </form>
+
+        <!-- Danh sách quán -->
+        <section v-else-if="view === 'shops'" key="shops" class="acct__form">
+          <div class="ios-group ios-list">
+            <button v-for="s in shops" :key="s.id" class="shop-item" :class="{ active: s.id === activeShopId }" @click="open(s)">
+              <span class="shop-item__icon">{{ (s.name || '?').trim()[0]?.toUpperCase() }}</span>
+              <span class="shop-item__txt"><b>{{ s.name }}</b><small>{{ s.id === activeShopId ? 'Đang mở trên máy này' : 'Mở trên máy này' }}</small></span>
+              <Icon v-if="s.id === activeShopId" name="check" :size="16" class="shop-item__check" />
+              <Icon name="right" :size="14" class="shop-item__chev" />
+            </button>
+            <button class="shop-item shop-item--add" @click="creating = true">
+              <span class="shop-item__icon"><Icon name="plus" :size="16" /></span>
+              <span class="shop-item__txt"><b>Tạo quán mới</b><small>Chi nhánh khác, dữ liệu riêng</small></span>
+            </button>
+          </div>
+        </section>
 
         <!-- Tạo quán -->
-        <form v-if="creating" class="acct__form" @submit.prevent="createShop">
-          <h3>Tạo quán mới</h3>
-          <div class="field"><label>Tên quán *</label><input class="input" v-model="form.name" placeholder="VD: Mây Coffee & Homestay" /></div>
-          <div class="field"><label>Địa chỉ</label><input class="input" v-model="form.address" /></div>
-          <div class="field"><label>Điện thoại</label><input class="input" type="tel" inputmode="tel" v-model="form.phone" /></div>
+        <form v-else-if="view === 'create'" key="create" class="acct__form" @submit.prevent="createShop" novalidate>
+          <button v-if="shops.length" type="button" class="acct__back" @click="creating = false"><Icon name="left" :size="14" />Quán của bạn</button>
 
-          <div v-if="legacyAvailable" class="field">
-            <label>Dữ liệu ban đầu</label>
-            <div class="src-pick">
-              <button type="button" :class="{ active: form.source === 'blank' }" @click="form.source = 'blank'">
-                <b>Quán trống</b><small>Tự thêm menu, phòng, nhân viên</small>
-              </button>
-              <button type="button" :class="{ active: form.source === 'legacy' }" @click="form.source = 'legacy'">
-                <b>Dữ liệu đang có trên máy này</b>
-                <small>{{ legacySummary.name || 'Quán hiện tại' }} · {{ legacySummary.products }} món · {{ legacySummary.rooms }} phòng · {{ legacySummary.invoices }} hoá đơn · {{ legacySummary.users }} nhân viên</small>
-              </button>
-            </div>
+          <p class="ios-caption">Thông tin quán</p>
+          <div class="ios-group">
+            <label class="ios-field"><span>Tên quán</span><input v-model="form.name" name="shopName" placeholder="VD: Mây Coffee & Homestay" /></label>
+            <label class="ios-field"><span>Địa chỉ <i>· không bắt buộc</i></span><input v-model="form.address" name="address" /></label>
+            <label class="ios-field"><span>Điện thoại <i>· không bắt buộc</i></span><input v-model="form.phone" name="phone" type="tel" inputmode="tel" /></label>
           </div>
 
-          <template v-if="form.source === 'blank'">
-            <div class="field"><label>Tên của bạn (hiện ở màn hình chọn người) *</label><input class="input" v-model="form.ownerName" /></div>
-            <div class="acct__row">
-              <div class="field"><label>Mã PIN 6 số *</label><input class="input num" type="password" inputmode="numeric" maxlength="6" v-model="form.pin" autocomplete="new-password" /></div>
-              <div class="field"><label>Nhập lại PIN *</label><input class="input num" type="password" inputmode="numeric" maxlength="6" v-model="form.pin2" autocomplete="new-password" /></div>
+          <template v-if="legacyAvailable">
+            <p class="ios-caption">Dữ liệu ban đầu</p>
+            <div class="ios-group src-pick" role="radiogroup">
+              <button type="button" role="radio" :aria-checked="form.source === 'blank'" :class="{ active: form.source === 'blank' }" @click="form.source = 'blank'">
+                <span class="src-pick__radio"></span>
+                <span><b>Quán trống</b><small>Tự thêm menu, phòng, nhân viên</small></span>
+              </button>
+              <button type="button" role="radio" :aria-checked="form.source === 'legacy'" :class="{ active: form.source === 'legacy' }" @click="form.source = 'legacy'">
+                <span class="src-pick__radio"></span>
+                <span>
+                  <b>Dữ liệu đang có trên máy này</b>
+                  <small>{{ legacySummary.name }} · {{ legacySummary.products }} món · {{ legacySummary.rooms }} phòng · {{ legacySummary.invoices }} hoá đơn · {{ legacySummary.users }} nhân viên</small>
+                </span>
+              </button>
             </div>
           </template>
-          <p v-else class="muted acct__small">Nhân viên và mã PIN giữ nguyên như đang dùng.</p>
 
-          <div class="acct__row">
-            <button v-if="shops.length" type="button" class="btn btn--ghost" @click="creating = false">Huỷ</button>
-            <button class="btn btn--primary" :disabled="busy" style="flex: 1">Tạo quán & mở</button>
-          </div>
+          <template v-if="form.source === 'blank'">
+            <p class="ios-caption">Chủ quán</p>
+            <div class="ios-group">
+              <label class="ios-field"><span>Tên của bạn</span><input v-model="form.ownerName" name="ownerName" placeholder="Hiện ở màn hình chọn người" /></label>
+              <div class="ios-row">
+                <label class="ios-field"><span>Mã PIN 6 số</span><input v-model="form.pin" name="pin" class="num" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" /></label>
+                <label class="ios-field"><span>Nhập lại PIN</span><input v-model="form.pin2" name="pin2" class="num" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" /></label>
+              </div>
+            </div>
+            <p class="acct__foot-note">Mã PIN dùng để vào ca trên máy bán hàng. Nhân viên thêm sau trong Cài đặt › Người dùng.</p>
+          </template>
+          <p v-else class="acct__foot-note">Nhân viên và mã PIN giữ nguyên như đang dùng.</p>
+
+          <button class="btn btn--primary acct__cta" :disabled="busy"><span v-if="busy" class="spin spin--light"></span>Tạo quán & mở</button>
         </form>
+      </Transition>
 
-        <footer class="acct__foot">
-          <span class="muted"><Icon name="fa-user" :size="13" /> {{ email }}</span>
-          <div class="acct__row">
-            <button v-if="activeShopId && boot.state === 'ready'" class="btn btn--plain btn--sm" @click="open(activeShop)">Quay lại quán</button>
-            <button class="btn btn--plain btn--sm" :disabled="busy" @click="logout">Đăng xuất</button>
-          </div>
-        </footer>
-      </section>
-    </div>
+      <!-- Tài khoản đang đăng nhập -->
+      <footer v-if="session && view !== 'loading'" class="acct__me">
+        <span class="acct__avatar">{{ initial }}</span>
+        <span class="acct__email">{{ email }}</span>
+        <button v-if="activeShopId && boot.state === 'ready'" class="acct__link" @click="open(activeShop)">Quay lại quán</button>
+        <button class="acct__link" :disabled="busy" @click="logout">Đăng xuất</button>
+      </footer>
+      <p v-else class="acct__legal"><Icon name="fa-lock" :size="12" /> Dữ liệu mỗi quán tách biệt · Nhân viên vào ca bằng mã PIN</p>
+    </main>
   </div>
 </template>
 
 <style lang="scss">
 @use '../styles/tokens' as *;
+// Trang tài khoản kiểu Apple ID: nền trơn sáng, 1 cột, tiêu đề lớn, nhóm ô nhập bo tròn
 .acct {
-  min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px calc(24px + var(--safe-bottom));
-  &__card { width: 100%; max-width: 460px; padding: 26px; border-radius: 22px; background: $surface; box-shadow: $shadow-lg; display: flex; flex-direction: column; gap: 18px; }
-  &__head { display: flex; gap: 14px; align-items: center; h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; } p { margin: 2px 0 0; font-size: 13px; } }
-  &__logo { width: 52px; height: 52px; object-fit: contain; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px $border; padding: 6px; }
-  &__sec, &__form { display: flex; flex-direction: column; gap: 12px; h3 { margin: 4px 0 0; font-size: 16px; } }
-  &__tabs { margin-bottom: 2px; }
-  &__row { display: flex; gap: 10px; align-items: flex-end; > .field { flex: 1; } }
-  &__small { font-size: 12px; margin: 0; line-height: 1.5; }
-  &__loading { display: flex; align-items: center; gap: 10px; color: $text-2; padding: 20px 0; justify-content: center; }
-  &__note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: $primary-soft; color: $text; font-size: 13px; line-height: 1.5; margin: 0;
-    .icon { color: $primary; margin-top: 2px; flex-shrink: 0; } .btn { margin-left: auto; flex-shrink: 0; }
-    &--warn { background: $warning-soft; .icon { color: $warning; } } }
-  &__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid $border; flex-wrap: wrap; font-size: 13px; }
+  position: fixed; inset: 0; z-index: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: max(40px, 7vh) 20px calc(32px + var(--safe-bottom));
+  background:
+    radial-gradient(900px 420px at 50% -120px, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%),
+    var(--bg);
+  color: $text;
+  -webkit-font-smoothing: antialiased;
 }
-.shop-list { display: flex; flex-direction: column; gap: 8px; }
-.shop-item {
-  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 0; border-radius: 14px; text-align: left; cursor: pointer;
-  background: $surface-2; box-shadow: inset 0 0 0 1px $border; font: inherit; color: $text;
+.acct__wrap { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 18px; }
+
+.acct__brand {
+  text-align: center; display: flex; flex-direction: column; align-items: center;
+  h1 { margin: 2px 0 0; font: 700 32px/1.12 $font-display; letter-spacing: -0.03em; }
+}
+.acct__icon {
+  width: 76px; height: 76px; border-radius: 19px; background: #fff; display: grid; place-items: center; margin-bottom: 14px;
+  box-shadow: 0 0 0 .5px rgba(0, 0, 0, .08), 0 10px 28px -10px rgba(60, 35, 15, .35), 0 2px 6px rgba(60, 35, 15, .08);
+  img { width: 74%; height: 74%; object-fit: contain; }
+}
+.acct__eyebrow { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: $primary; }
+.acct__lead { margin: 8px auto 0; max-width: 340px; font-size: 15px; line-height: 1.45; color: $text-2; }
+
+.acct__form { display: flex; flex-direction: column; gap: 10px; }
+
+// ---- Nhóm ô nhập (inset grouped) ----
+.ios-group {
+  background: $surface; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 0 0 .5px $border-strong, 0 1px 2px rgba(0, 0, 0, .04);
+  > * + *, .ios-row > * + * { border-top: .5px solid $border-strong !important; }
+}
+// danh sách: đường kẻ thụt vào sau biểu tượng như iOS
+.ios-list > .shop-item + .shop-item { border-top: 0 !important; position: relative;
+  &::before { content: ''; position: absolute; top: 0; left: 66px; right: 0; height: .5px; background: $border-strong; } }
+.ios-row { display: grid; grid-template-columns: 1fr 1fr; > * + * { border-top: 0 !important; border-left: .5px solid $border-strong; } }
+.ios-field {
+  position: relative; display: flex; flex-direction: column; gap: 2px; padding: 9px 16px 8px; cursor: text;
+  transition: background .15s;
+  > span { font-size: 12px; font-weight: 500; color: $text-2; i { font-style: normal; color: $text-muted; font-weight: 400; } }
+  input {
+    width: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: $text;
+    font: 400 17px/1.35 $font-family; letter-spacing: -0.01em;
+    &::placeholder { color: $text-muted; opacity: .7; }
+  }
+  &:focus-within { background: color-mix(in srgb, var(--primary) 5%, transparent); > span { color: $primary; } }
+  &--pw input { padding-right: 34px; }
+  &__eye {
+    position: absolute; right: 8px; bottom: 6px; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent;
+    color: $text-muted; display: grid; place-items: center; cursor: pointer;
+    &:hover { color: $text; background: $fill; }
+  }
+}
+.ios-caption { margin: 10px 4px -2px; font-size: 13px; font-weight: 500; color: $text-2; }
+.acct__foot-note { margin: -2px 4px 0; font-size: 12.5px; line-height: 1.5; color: $text-muted; }
+
+.acct__cta {
+  height: 50px; margin-top: 8px; border-radius: 14px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; gap: 10px;
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--primary) 70%, transparent);
+}
+.acct-switch { margin: 6px 0 0; text-align: center; font-size: 14px; color: $text-2; }
+.acct__link {
+  border: 0; background: none; padding: 4px 2px; font: inherit; font-weight: 600; color: $primary; cursor: pointer; border-radius: 6px;
+  &:hover { text-decoration: underline; text-underline-offset: 3px; }
+  &:disabled { opacity: .5; }
+}
+.acct__back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin: 0 0 2px -4px; padding: 6px 8px; border: 0; border-radius: 8px;
+  background: none; color: $primary; font: 500 15px/1 $font-family; cursor: pointer;
   &:hover { background: $fill; }
-  &.active { box-shadow: inset 0 0 0 2px $primary; background: $primary-soft; }
-  &__icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: $surface; color: $primary; flex-shrink: 0; }
-  &__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } small { color: $text-2; font-size: 12px; } }
 }
+
+// ---- Danh sách quán (như danh sách trong Cài đặt của iPhone) ----
+.ios-list { display: flex; flex-direction: column; }
+.shop-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px 12px 14px; border: 0; background: transparent;
+  text-align: left; cursor: pointer; font: inherit; color: $text; transition: background .15s;
+  &:hover { background: $fill; } &:active { background: $border; }
+  &__icon {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 78%, #fff), var(--primary)); color: $on-primary;
+    font: 700 17px/1 $font-display; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .08);
+  }
+  &__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+    b { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    small { font-size: 13px; color: $text-2; } }
+  &__check { color: $primary; }
+  &__chev { color: $text-muted; }
+  &.active small { color: $primary; }
+  &--add { .shop-item__icon { background: $fill; color: $primary; box-shadow: none; } b { color: $primary; } }
+}
+
+// ---- Chọn dữ liệu ban đầu ----
 .src-pick {
-  display: grid; gap: 8px;
-  button { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-align: left; border: 0; border-radius: 12px; cursor: pointer;
-    background: $surface; box-shadow: inset 0 0 0 1px $border-strong; font: inherit; color: $text;
-    small { font-size: 12px; color: $text-2; }
-    &.active { background: $primary-soft; box-shadow: inset 0 0 0 2px $primary; b { color: $primary; } } }
+  display: flex; flex-direction: column;
+  button {
+    display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border: 0; background: transparent; text-align: left;
+    font: inherit; color: $text; cursor: pointer;
+    > span:last-child { display: flex; flex-direction: column; gap: 2px; b { font-size: 15px; font-weight: 600; } small { font-size: 12.5px; color: $text-2; line-height: 1.4; } }
+    &:hover { background: $fill; }
+  }
+  &__radio { flex-shrink: 0; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px $border-strong; transition: box-shadow .2s; }
+  button.active .src-pick__radio { box-shadow: inset 0 0 0 6px var(--primary); }
 }
-.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid $border-strong; border-top-color: $primary; animation: spin .8s linear infinite; }
+
+// ---- Thông báo ----
+.acct__note {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 12px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.5;
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface)); color: $text;
+  .icon { color: $primary; margin-top: 2px; flex-shrink: 0; }
+  .acct__link { margin-left: auto; flex-shrink: 0; }
+  &--warn { background: $warning-soft; .icon { color: $warning; } }
+}
+
+// ---- Tài khoản đang đăng nhập ----
+.acct__me {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; padding: 12px 4px 0; border-top: .5px solid $border-strong; font-size: 14px;
+}
+.acct__avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: $fill; color: $text; font-weight: 600; font-size: 13px; }
+.acct__email { flex: 1; min-width: 0; color: $text-2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct__legal { margin: 8px 0 0; text-align: center; font-size: 12px; color: $text-muted; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+.acct__loading { display: grid; place-items: center; padding: 40px 0; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid $border-strong; border-top-color: $primary; animation: spin .8s linear infinite; display: inline-block; }
+.spin--light { width: 16px; height: 16px; border-color: rgba(255, 255, 255, .35); border-top-color: #fff; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+// Chuyển giữa các bước: mờ dần + trượt nhẹ
+.acct-step-enter-active { transition: opacity .28s $ease-out, transform .32s $ease-out; }
+.acct-step-leave-active { transition: opacity .12s ease-in; }
+.acct-step-enter-from { opacity: 0; transform: translateY(8px); }
+.acct-step-leave-to { opacity: 0; }
+
+// Máy tính: đặt trong khung nổi nhẹ cho gọn mắt
+@media (min-width: 720px) {
+  .acct { padding: 40px 20px; }
+  // margin auto: căn giữa theo chiều dọc nhưng không bị cắt đầu khi nội dung cao hơn màn hình
+  .acct__wrap { margin: auto 0; max-width: 460px; padding: 40px 40px 28px; border-radius: 28px; background: color-mix(in srgb, var(--surface) 70%, transparent);
+    box-shadow: 0 0 0 .5px $border-strong, 0 30px 60px -30px rgba(60, 35, 15, .25); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+}
 </style>
