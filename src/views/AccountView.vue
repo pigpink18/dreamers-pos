@@ -8,6 +8,7 @@
  */
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import Icon from '../components/ui/Icon.vue'
+import WelcomeSplash from '../components/account/WelcomeSplash.vue'
 import logo from '../assets/image/logo.png'
 import { useUi } from '../stores/ui'
 import { useAuth } from '../stores/auth'
@@ -196,6 +197,19 @@ async function logout(everywhere = false) {
   location.reload()
 }
 
+// ---- Màn chào: lần đầu mở trang tài khoản trong phiên (khi chưa mở quán), tắt nếu máy / app giảm chuyển động ----
+const SPLASH = 'dreamers:splash'
+const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'off'
+let splashSeen = false
+try { splashSeen = sessionStorage.getItem(SPLASH) === '1' } catch { /* bỏ qua */ }
+const showSplash = ref(!splashSeen && !reduceMotion && !(activeShopId && boot.state === 'ready'))
+const entered = ref(!showSplash.value) // true -> các phần của form trượt lên lần lượt
+function splashDone() {
+  showSplash.value = false
+  try { sessionStorage.setItem(SPLASH, '1') } catch { /* bỏ qua */ }
+  entered.value = true
+}
+
 const email = computed(() => session.value?.user?.email || '')
 const initial = computed(() => (email.value[0] || '?').toUpperCase())
 const showPw = ref(false)
@@ -224,7 +238,8 @@ function switchMode() {
 
 <template>
   <div class="acct">
-    <main class="acct__wrap">
+    <Transition name="splash-out"><WelcomeSplash v-if="showSplash" @done="splashDone" /></Transition>
+    <main class="acct__wrap" :class="{ 'is-in': entered }">
       <!-- Biểu tượng app + tiêu đề -->
       <header class="acct__brand">
         <div class="acct__icon"><img :src="logo" alt="Dreamers POS" /></div>
@@ -492,6 +507,20 @@ function switchMode() {
 .spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid $border-strong; border-top-color: $primary; animation: spin .8s linear infinite; display: inline-block; }
 .spin--light { width: 16px; height: 16px; border-color: rgba(255, 255, 255, .35); border-top-color: #fff; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+// ---- Xuất hiện lần lượt sau màn chào: biểu tượng, tiêu đề, ô nhập, nút ----
+.acct__wrap > * { opacity: 0; }
+.acct__wrap.is-in > * { animation: acctIn .6s $ease-out both; }
+.acct__wrap.is-in .acct__form > * { animation: acctIn .55s $ease-out both; }
+@for $i from 1 through 8 {
+  .acct__wrap.is-in > :nth-child(#{$i}) { animation-delay: #{($i - 1) * 70ms}; }
+  .acct__wrap.is-in .acct__form > :nth-child(#{$i}) { animation-delay: #{120 + ($i - 1) * 60ms}; }
+}
+.acct__wrap.is-in .acct__icon { animation: acctIconIn .8s cubic-bezier(.2, 1.3, .3, 1) both; }
+@keyframes acctIn { from { opacity: 0; transform: translateY(14px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes acctIconIn { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+[data-motion='off'] .acct__wrap > *, [data-motion='off'] .acct__wrap .acct__form > * { animation: none !important; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .acct__wrap > *, .acct__wrap .acct__form > * { animation: none !important; opacity: 1; } }
 
 // Chuyển giữa các bước: mờ dần + trượt nhẹ
 .acct-step-enter-active { transition: opacity .28s $ease-out, transform .32s $ease-out; }
