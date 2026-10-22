@@ -424,7 +424,6 @@ function switchMode() {
       <p v-if="session && view !== 'loading'" class="acct__legal">
         <button class="acct__link acct__link--muted" :disabled="busy" @click="logout(true)"><Icon name="fa-right-from-bracket" :size="12" /> Đăng xuất khỏi mọi máy</button>
       </p>
-      <p v-else class="acct__legal"><Icon name="fa-lock" :size="12" /> Dữ liệu mỗi quán tách biệt · Nhân viên vào ca bằng mã PIN</p>
     </main>
   </div>
 </template>
