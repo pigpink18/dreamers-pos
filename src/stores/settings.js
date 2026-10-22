@@ -1,13 +1,21 @@
 import { defineStore } from 'pinia'
 import { useStorage } from '../utils/storage'
+import { isLegacy, activeShop, nsKey } from '../tenant'
+
+/** Thông tin mặc định của Dreamers (chế độ 1 máy cũ) — dùng khi đưa dữ liệu Dreamers lên hệ thống */
+export const LEGACY_SHOP = {
+  name: 'Dreamers Home & Coffee',
+  address: '19B Đặng Thái Thân, Phường 3, TP. Đà Lạt, Lâm Đồng',
+  phone: '(+84) 865 665 603',
+  footer: 'Cảm ơn quý khách — hẹn gặp lại tại Dreamers!',
+}
+export const LEGACY_PAYMENT = { bin: '970422', account: '0865665603', holder: '', qrOnReceipt: true }
 
 export const useSettings = defineStore('settings', () => {
-  const shop = useStorage('shop', {
-    name: 'Dreamers Home & Coffee',
-    address: '19B Đặng Thái Thân, Phường 3, TP. Đà Lạt, Lâm Đồng',
-    phone: '(+84) 865 665 603',
-    footer: 'Cảm ơn quý khách — hẹn gặp lại tại Dreamers!',
-  })
+  // Quán Dreamers (chế độ 1 máy cũ) giữ thông tin sẵn có; quán mới trên hệ thống bắt đầu trống
+  const shop = useStorage('shop', isLegacy
+    ? { ...LEGACY_SHOP }
+    : { name: activeShop?.name || '', address: '', phone: '', footer: 'Cảm ơn quý khách — hẹn gặp lại!' })
   const counters = useStorage('counters', { HD: 0, DP: 0, PN: 0, KH: 0, SP: 0, CA: 0 })
   /** Quy tắc vận hành của cửa hàng */
   const ops = useStorage('ops', {
@@ -18,12 +26,13 @@ export const useSettings = defineStore('settings', () => {
 
   /** Tài khoản nhận chuyển khoản (VietQR) */
   // Mặc định: MB Bank của Yến (BIN 970422). Đổi trong Cài đặt -> Thanh toán.
-  const DEFAULT_PAYMENT = { bin: '970422', account: '0865665603', holder: '', qrOnReceipt: true }
-  const payment = useStorage('payment', { ...DEFAULT_PAYMENT })
+  const DEFAULT_PAYMENT = LEGACY_PAYMENT
+  // Tài khoản MB của Yến chỉ là mặc định của Dreamers; quán khác tự nhập tài khoản của mình
+  const payment = useStorage('payment', isLegacy ? { ...DEFAULT_PAYMENT } : { bin: '', account: '', holder: '', qrOnReceipt: true })
   // Máy đang để trống tài khoản (bản cũ) -> điền tài khoản MB của Yến, chỉ 1 lần (sau đó chủ quán xoá / đổi thì giữ nguyên)
-  if (!localStorage.getItem('dreamers:payDefault')) {
+  if (isLegacy && !localStorage.getItem(nsKey('payDefault'))) {
     if (!payment.value.account) Object.assign(payment.value, { bin: DEFAULT_PAYMENT.bin, account: DEFAULT_PAYMENT.account, qrOnReceipt: true })
-    localStorage.setItem('dreamers:payDefault', '1')
+    localStorage.setItem(nsKey('payDefault'), '1')
   }
   /** Hoá đơn điện tử */
   const einvoice = useStorage('einvoice', {

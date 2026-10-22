@@ -1,4 +1,5 @@
 <script setup>
+import { transferTag } from '../../tenant'
 // Mẫu in hoá đơn khổ K80 (máy in nhiệt). Dùng chung cho POS, danh sách hoá đơn, trả phòng.
 import { money, fmtDateTime, number } from '../../utils/format'
 import { useSettings } from '../../stores/settings'
@@ -45,7 +46,7 @@ const settings = useSettings()
     </div>
     <VietQrCard
       v-if="invoice.method === 'transfer' && invoice.status !== 'cancelled' && settings.payment.qrOnReceipt && invoice.total - (invoice.deposit || 0) > 0"
-      compact :amount="invoice.total - (invoice.deposit || 0)" :note="`${invoice.code} Dreamers`"
+      compact :amount="invoice.total - (invoice.deposit || 0)" :note="`${invoice.code} ${transferTag(settings.shop.name)}`.trim()"
     />
     <div v-if="invoice.status === 'cancelled'" class="receipt__void">ĐÃ HUỶ</div>
     <div class="receipt__foot">{{ settings.shop.footer }}</div>

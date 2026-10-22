@@ -1,4 +1,5 @@
 <script setup>
+import { transferTag } from '../../tenant'
 /** Cài đặt tài khoản nhận chuyển khoản (VietQR) */
 import { reactive } from 'vue'
 import Icon from '../ui/Icon.vue'
@@ -41,7 +42,7 @@ function save() {
       </form>
       <div v-if="settings.payment.account" class="mt-16">
         <div class="eyebrow-s">Xem trước (50.000 ₫)</div>
-        <VietQrCard :amount="50000" note="HD000001 Dreamers" :size="160" />
+        <VietQrCard :amount="50000" :note="`HD000001 ${transferTag(settings.shop.name)}`.trim()" :size="160" />
       </div>
       <p class="muted mt-16" style="font-size: 12px"><Icon name="fa-circle-info" :size="12" /> Hãy chuyển thử 1 lần từ điện thoại để chắc chắn số tài khoản đúng trước khi dùng với khách.</p>
     </div>

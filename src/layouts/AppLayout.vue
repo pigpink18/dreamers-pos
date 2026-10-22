@@ -10,6 +10,7 @@ import { useRooms } from '../stores/rooms'
 import { useAuth, initials } from '../stores/auth'
 import { useShifts } from '../stores/shifts'
 import { useSettings } from '../stores/settings'
+import { isLegacy } from '../tenant'
 import { useAppearance } from '../stores/theme'
 import { fmtDate, weekday, dateKey, fmtTime } from '../utils/format'
 import logoMark from '../assets/image/logo-mark.png'
@@ -22,6 +23,10 @@ const rooms = useRooms()
 const auth = useAuth()
 const shifts = useShifts()
 const settings = useSettings()
+// Thương hiệu trên menu: Dreamers giữ logo con sóc; quán khác hiện tên quán của mình
+const isDreamers = computed(() => isLegacy || /dreamers/i.test(settings.shop.name || ''))
+const brandName = computed(() => (isDreamers.value ? 'Dreamers' : settings.shop.name || 'Quán của bạn'))
+const brandSub = computed(() => (isDreamers.value ? 'Home & Coffee' : settings.shop.address || 'Bán hàng & phòng'))
 const appearance = useAppearance()
 const today = dateKey()
 const horizontal = computed(() => appearance.prefs.layout === 'horizontal')
@@ -131,10 +136,13 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
     <!-- ============ MENU DỌC ============ -->
     <aside v-if="!horizontal" class="sidebar">
       <div class="brand">
-        <div class="brand__logo"><img :src="logoMark" alt="Dreamers" /></div>
+        <div class="brand__logo" :class="{ 'brand__logo--generic': !isDreamers }">
+          <img v-if="isDreamers" :src="logoMark" alt="Dreamers" />
+          <Icon v-else name="fa-mug-saucer" :size="20" />
+        </div>
         <div class="brand__text">
-          <div class="brand__name">Dreamers</div>
-          <div class="brand__shop">Home &amp; Coffee</div>
+          <div class="brand__name">{{ brandName }}</div>
+          <div class="brand__shop">{{ brandSub }}</div>
         </div>
       </div>
 
@@ -159,8 +167,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
       <header class="topbar">
         <!-- Logo: hiện ở menu ngang và trên điện thoại -->
         <RouterLink to="/" class="topbar__brand" :class="{ 'only-mobile-flex': !horizontal }">
-          <div class="brand__logo brand__logo--sm"><img :src="logoMark" alt="" /></div>
-          <span>Dreamers</span>
+          <div class="brand__logo brand__logo--sm" :class="{ 'brand__logo--generic': !isDreamers }">
+            <img v-if="isDreamers" :src="logoMark" alt="" />
+            <Icon v-else name="fa-mug-saucer" :size="16" />
+          </div>
+          <span>{{ brandName }}</span>
         </RouterLink>
 
         <!-- MENU NGANG -->
@@ -280,30 +291,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
     <ShiftOpenModal v-if="showOpenShift || ui.shiftRequest" @opened="ui.resolveShift(true)" @close="showOpenShift = false; ui.shiftRequest && ui.resolveShift(false)" />
     <ShiftCloseModal v-if="showCloseShift" @close="showCloseShift = false" />
 
-    <!-- Toast -->
-    <div class="toasts">
-      <TransitionGroup name="toast">
-        <div v-for="t in ui.toasts" :key="t.id" class="toast" :class="t.type">
-          <Icon :name="t.type === 'error' ? 'alert' : 'check'" :size="15" /> {{ t.message }}
-        </div>
-      </TransitionGroup>
-    </div>
-
-    <!-- Hộp xác nhận kiểu alert của macOS/iOS -->
-    <Teleport to="body">
-      <div v-if="ui.confirmState" class="modal-backdrop modal-backdrop--top alert-backdrop" @click.self="ui.closeConfirm(false)">
-        <div class="alert">
-          <h3>{{ ui.confirmState.title }}</h3>
-          <p>{{ ui.confirmState.message }}</p>
-          <div class="alert__actions">
-            <button class="btn btn--ghost" @click="ui.closeConfirm(false)">Huỷ</button>
-            <button class="btn" :class="ui.confirmState.danger ? 'btn--danger' : 'btn--primary'" @click="ui.closeConfirm(true)" autofocus>
-              {{ ui.confirmState.okText }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -330,10 +317,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
     box-shadow: 0 0 0 .5px $border-strong, $shadow-sm;
     img { width: 78%; height: 78%; object-fit: contain; }
     &--sm { width: 30px; height: 30px; border-radius: 8px; }
+    &--generic { background: $primary; color: $on-primary; box-shadow: $shadow-sm; }
   }
   &__text { min-width: 0; line-height: 1.25; }
-  &__name { font-weight: 600; font-size: 15px; letter-spacing: -0.015em; }
-  &__shop { font-size: 12px; color: $text-muted; }
+  &__name { font-weight: 600; font-size: 15px; letter-spacing: -0.015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  &__shop { font-size: 12px; color: $text-muted; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 .nav-group { font-size: 11px; font-weight: 600; color: $text-muted; padding: 16px 10px 5px; }
 .nav-link {
@@ -357,7 +345,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
   @include vibrancy(var(--topbar-bg));
   &__title { font-size: 15px; font-weight: 600; }
   &__date { color: $text-2; font-size: 13px; white-space: nowrap; }
-  &__brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; color: $text; flex-shrink: 0; }
+  &__brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; color: $text; flex-shrink: 0; min-width: 0; > span { max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
   &__brand.only-mobile-flex { display: none; }
 }
 .is-horizontal .topbar { border-bottom: 1px solid $border; gap: 18px; }

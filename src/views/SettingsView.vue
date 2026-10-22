@@ -19,6 +19,7 @@ import { useAuth, PERMISSION_GROUPS, initials } from '../stores/auth'
 import { useAudit } from '../stores/audit'
 import { useAppearance, THEMES, LAYOUTS, MOTIONS } from '../stores/theme'
 import { clearAll, exportAll, importAll, markSeeded } from '../utils/storage'
+import { nsKey, isLegacy, activeShop, activeShopId, setActiveShop } from '../tenant'
 import { download, dateKey, fmtDate } from '../utils/format'
 
 const settings = useSettings()
@@ -37,7 +38,7 @@ const TABS = [
   { key: 'payment', label: 'Thanh toán', icon: 'fa-qrcode', perm: 'settings.manage' },
   { key: 'einvoice', label: 'Hoá đơn điện tử', icon: 'fa-file-invoice', perm: 'settings.manage' },
   { key: 'channels', label: 'Kênh đặt phòng', icon: 'fa-calendar-arrow-down', perm: 'settings.manage' },
-  { key: 'server', label: 'Đồng bộ', icon: 'fa-cloud', perm: 'settings.manage' },
+  { key: 'server', label: 'Tài khoản & đồng bộ', icon: 'fa-cloud', perm: 'settings.manage' },
   { key: 'ops', label: 'Vận hành', icon: 'fa-sliders', perm: 'settings.manage' },
   { key: 'data', label: 'Dữ liệu', icon: 'fa-database', perm: 'settings.manage' },
 ]
@@ -51,6 +52,13 @@ const tab = computed({
 const shop = reactive({ ...settings.shop })
 function saveShop() {
   Object.assign(settings.shop, shop)
+  // Quán trên hệ thống: đổi tên quán ở cả danh sách quán của tài khoản
+  if (!isLegacy && shop.name?.trim() && shop.name.trim() !== activeShop?.name) {
+    import('../sync/connection').then((m) => m.renameShop(activeShopId, shop.name)).then(
+      () => setActiveShop({ id: activeShopId, name: shop.name.trim() }),
+      (e) => ui.toast('Chưa đổi được tên quán trên máy chủ: ' + e.message, 'error'),
+    )
+  }
   audit.log('settings.update', 'Sửa thông tin cửa hàng')
   ui.toast('Đã lưu thông tin cửa hàng')
 }
@@ -129,7 +137,9 @@ function restore(e) {
       audit.log('data.restore', `Khôi phục từ file ${f.name}`)
       const entry = audit.entries[0]
       await nextTick()
-      importAll({ ...data, audit: [entry, ...(Array.isArray(data.audit) ? data.audit : [])] })
+      const all = { ...data, audit: [entry, ...(Array.isArray(data.audit) ? data.audit : [])] }
+      if (isLegacy) importAll(all)
+      else await restoreShop(all)
       location.reload()
     } catch {
       ui.toast('File sao lưu không hợp lệ', 'error')
@@ -138,6 +148,31 @@ function restore(e) {
   reader.readAsText(f)
   e.target.value = ''
 }
+/**
+ * Quán trên hệ thống: khôi phục / xoá phải đi qua bộ đồng bộ (gán lại dữ liệu trong app) để máy chủ
+ * và các máy khác của quán cập nhật theo — không chỉ ghi đè localStorage của máy này.
+ */
+async function restoreShop(all) {
+  const { sync, SYNC_KEYS } = await import('../sync/engine')
+  Object.entries(all).forEach(([k, v]) => {
+    if (k.startsWith('sync:') || ['session', 'init', 'appearance'].includes(k)) return
+    const r = sync.registry.get(k)
+    if (r && SYNC_KEYS.includes(k)) r.value = v
+    else localStorage.setItem(nsKey(k), JSON.stringify(v))
+  })
+  // bản ghi có trong máy chủ mà không có trong file -> bộ đồng bộ hiểu là đã xoá
+  await new Promise((r) => setTimeout(r, 600))
+  await sync.flush()
+}
+async function wipeShop() {
+  const { sync } = await import('../sync/engine')
+  ;['products', 'imports', 'customers', 'invoices', 'rooms', 'bookings', 'shifts', 'audit'].forEach((k) => {
+    const r = sync.registry.get(k)
+    if (r) r.value = []
+  })
+  await new Promise((r) => setTimeout(r, 600))
+  await sync.flush()
+}
 async function wipe(withDemo) {
   const msg = withDemo
     ? 'Xoá hết và nạp dữ liệu mẫu (món, phòng, hoá đơn 150 ngày) để xem thử?'
@@ -145,8 +180,13 @@ async function wipe(withDemo) {
   if (!(await ui.confirm(msg, { danger: true, okText: 'Xoá dữ liệu' }))) return
   const approver = await ui.approve({ perm: 'settings.manage', reason: 'Xoá dữ liệu cửa hàng' })
   if (!approver) return
-  if (withDemo) localStorage.setItem('dreamers:wantDemo', '1') // main.js xoá hết rồi nạp dữ liệu mẫu
-  else {
+  if (withDemo) localStorage.setItem(nsKey('wantDemo'), '1') // main.js xoá hết rồi nạp dữ liệu mẫu
+  else if (!isLegacy) {
+    await wipeShop()
+    settings.ops.demo = false
+    useAudit().log('data.reset', 'Xoá dữ liệu để bắt đầu dùng thật', { approvedBy: approver })
+    await new Promise((r) => setTimeout(r, 600))
+  } else {
     clearAll(['users', 'roles', 'session', 'appearance', 'shop', 'ops'])
     settings.ops.demo = false
     markSeeded()
@@ -340,7 +380,7 @@ async function wipe(withDemo) {
         <section v-else-if="tab === 'data'" class="card">
           <div class="card__header"><h3>Dữ liệu</h3></div>
           <div class="card__body settings-data">
-            <p class="text-2">Dữ liệu đang lưu trong trình duyệt của máy này. Hãy sao lưu định kỳ.</p>
+            <p class="text-2">{{ isLegacy ? 'Dữ liệu đang lưu trong trình duyệt của máy này. Hãy sao lưu định kỳ.' : 'Dữ liệu của quán lưu trên máy chủ và đồng bộ giữa các máy. Vẫn nên sao lưu định kỳ.' }}</p>
             <div class="flex" style="flex-wrap: wrap">
               <button class="btn btn--ghost" @click="backup"><Icon name="download" :size="15" />Sao lưu (JSON)</button>
               <button class="btn btn--ghost" @click="fileEl.click()"><Icon name="upload" :size="15" />Khôi phục từ file</button>
@@ -348,7 +388,7 @@ async function wipe(withDemo) {
             </div>
             <hr />
             <div class="flex" style="flex-wrap: wrap">
-              <button class="btn btn--soft" @click="wipe(true)"><Icon name="sparkle" :size="15" />Nạp dữ liệu mẫu</button>
+              <button v-if="isLegacy" class="btn btn--soft" @click="wipe(true)"><Icon name="sparkle" :size="15" />Nạp dữ liệu mẫu</button>
               <button class="btn btn--danger" @click="wipe(false)"><Icon name="trash" :size="15" />Xoá dữ liệu, bắt đầu dùng thật</button>
             </div>
             <p class="muted" style="margin-top: 10px; font-size: 13px">"Bắt đầu dùng thật" giữ lại người dùng, phân quyền, giao diện và thông tin cửa hàng.</p>

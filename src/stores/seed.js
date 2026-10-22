@@ -9,6 +9,7 @@ import { useInvoices } from './invoices'
 import { useRooms } from './rooms'
 import { dateKey, addDays, parseKey } from '../utils/format'
 import { markSeeded } from '../utils/storage'
+import { nsKey } from '../tenant'
 import { useAuth, hashPin } from './auth'
 import { useShifts } from './shifts'
 import { useAudit, withoutAudit } from './audit'
@@ -105,7 +106,7 @@ export const MENU_VERSION = 4 // tăng số này mỗi khi thêm món vào MENU 
 
 /** Dữ liệu thật (không phải mẫu): thêm các món trong MENU còn thiếu, chạy 1 lần cho mỗi phiên bản menu */
 export function ensureMenu() {
-  const key = 'dreamers:menuVersion'
+  const key = nsKey('menuVersion')
   if (+localStorage.getItem(key) >= MENU_VERSION) return
   const products = useProducts()
   const have = new Set(products.items.map((p) => p.name.toLowerCase()))
@@ -140,7 +141,7 @@ const OLD_EN_TYPES = { 'Cloud Room': 'Mây Room', 'Sunny Room': 'Nắng Room', '
 
 /** Đổi tên loại phòng tiếng Anh cũ thành "<tên phòng> Room" — chạy 1 lần */
 export function viRoomTypes() {
-  const key = 'dreamers:roomTypeVi'
+  const key = nsKey('roomTypeVi')
   if (localStorage.getItem(key)) return
   useRooms().rooms.forEach((r) => { if (OLD_EN_TYPES[r.type]) r.type = `${r.name} Room` })
   // dòng tiền phòng trên hoá đơn cũ: "Phòng Mây (Cloud Room) × 2 đêm" -> "Phòng Mây (Mây Room) × 2 đêm"
@@ -152,7 +153,7 @@ export function viRoomTypes() {
 
 /** Thêm 7 phòng Dreamers nếu máy chưa có phòng nào (chạy 1 lần, xoá phòng rồi thì không tự thêm lại) */
 export function ensureRooms() {
-  const key = 'dreamers:roomsVersion'
+  const key = nsKey('roomsVersion')
   if (localStorage.getItem(key)) return
   const rooms = useRooms()
   if (!rooms.rooms.length) withoutAudit(() => ROOMS.forEach(([name, type, floor, price, capacity]) => rooms.saveRoom({ name, type, floor, price, capacity })))
@@ -173,13 +174,36 @@ export function seedFresh() {
   ensureRooms() // và 7 phòng
 }
 
+/**
+ * QUÁN MỚI TRÊN HỆ THỐNG: hoàn toàn trống — chỉ có tài khoản chủ quán (tên + PIN) và thông tin quán.
+ * Không có menu, phòng, khách hay hoá đơn; chủ quán tự thêm.
+ * init: { name, address, phone, ownerName, pin }
+ */
+export function seedBlankShop(init) {
+  withoutAudit(() => {
+    const auth = useAuth()
+    auth.users.splice(0, auth.users.length, {
+      id: 'u' + Date.now().toString(36), name: String(init.ownerName).trim(), roleId: 'owner',
+      pinHash: hashPin(String(init.pin)), active: true, createdAt: new Date().toISOString(),
+    })
+    const settings = useSettings()
+    Object.assign(settings.shop, {
+      name: String(init.name || '').trim(),
+      address: String(init.address || '').trim(),
+      phone: String(init.phone || '').trim(),
+    })
+    settings.ops.demo = false
+  })
+  markSeeded()
+}
+
 /** Nạp toàn bộ dữ liệu mẫu (không ghi nhật ký trong lúc nạp) */
 export function seedDemo() {
   withoutAudit(seedAll)
   seedAuditSamples()
   useSettings().ops.demo = true
   markSeeded()
-  localStorage.setItem('dreamers:menuVersion', String(MENU_VERSION))
+  localStorage.setItem(nsKey('menuVersion'), String(MENU_VERSION))
 }
 
 function seedAll() {

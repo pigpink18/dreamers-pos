@@ -164,12 +164,12 @@ Mở `src/styles/main.scss`, sửa các biến ở đầu file:
 
 | Tính năng | Ở đâu | Cần gì |
 |---|---|---|
-| **Dùng chung dữ liệu nhiều máy** (realtime, chạy được khi mất mạng) | Cài đặt › Đồng bộ | Dự án Supabase (miễn phí) — xem `supabase/HUONG-DAN.md` |
+| **Hệ thống nhiều quán**: chủ quán tự đăng ký, mỗi quán dữ liệu riêng, 1 tài khoản nhiều chi nhánh, nhiều máy dùng chung dữ liệu (realtime, chạy được khi mất mạng) | Màn Tài khoản chủ quán · Cài đặt › Tài khoản & đồng bộ | Dự án Supabase (miễn phí) + 2 biến `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` trên GitHub — xem `supabase/HUONG-DAN.md` |
 | **QR chuyển khoản VietQR** (có sẵn số tiền + mã hoá đơn) | Cài đặt › Thanh toán | Chỉ cần số tài khoản; mã tạo ngay trên máy, không cần mạng |
 | **Hoá đơn điện tử** | Cài đặt › Hoá đơn điện tử · nút "Xuất HĐĐT" trong hoá đơn | Chế độ Thử nghiệm dùng ngay; xuất thật cần hợp đồng MISA/Viettel/VNPT + Edge Function `einvoice` |
 | **Lịch Booking.com / Airbnb** (iCal 2 chiều) | Cài đặt › Kênh đặt phòng | Link iCal từ OTA; link xuất lịch cần Edge Function `ical` |
 
-Mã nguồn liên quan: `src/sync/` (đồng bộ), `src/utils/vietqr.js`, `src/einvoice/`, `src/channels/ical.js`, `supabase/` (SQL + Edge Functions).
+Mã nguồn liên quan: `src/tenant.js` (quán đang mở, tách dữ liệu theo quán), `src/views/AccountView.vue` (tài khoản chủ quán), `src/sync/` (đồng bộ), `src/utils/vietqr.js`, `src/einvoice/`, `src/channels/ical.js`, `supabase/` (SQL + Edge Functions).
 
 ## Giới hạn hiện tại và hướng nâng cấp
 

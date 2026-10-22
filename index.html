@@ -20,7 +20,10 @@
     <title>Dreamers Home & Coffee POS</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Hiện trong lúc app khởi động (VD máy mới đang tải dữ liệu quán từ máy chủ); tự mất khi app sẵn sàng -->
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font:500 15px/1.4 Inter,system-ui,sans-serif;color:#8a7766">Đang mở quán…</div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

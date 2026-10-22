@@ -8,11 +8,13 @@
  *   - Nhận thay đổi từ máy khác qua Realtime → áp vào dữ liệu trên máy này.
  *   - Cứ mỗi phút kéo bù những gì bị lỡ (VD lúc mất mạng).
  *
- * Bảng `docs`: (collection, id) → data jsonb, deleted, updated_at, device
+ * Bảng `shop_docs`: (shop_id, collection, id) → data jsonb, deleted, updated_at, device
+ * Mỗi máy chỉ đồng bộ dữ liệu của QUÁN ĐANG MỞ (shop_id). Máy chủ (RLS) chặn đọc/ghi quán khác.
  * Bộ sưu tập dạng mảng: mỗi phần tử có `id` là 1 bản ghi. Dạng object (shop, counters…): 1 bản ghi id = '_'.
  * Xung đột: bản ghi nào ghi sau thắng. Riêng `counters` lấy số lớn nhất để mã hoá đơn không bị trùng.
  */
 import { reactive, watch, toRaw } from 'vue'
+import { PREFIX, activeShopId } from '../tenant'
 
 export const SYNC_KEYS = [
   'users', 'roles', 'products', 'imports', 'customers', 'invoices', 'rooms', 'bookings', 'shifts', 'audit',
@@ -24,7 +26,8 @@ const NEWEST_FIRST = ['invoices', 'audit', 'customers', 'imports', 'shifts']
 const timeOf = (d) => d?.createdAt || d?.at || d?.openedAt || d?.date || ''
 const PAGE = 1000
 
-export function createSyncEngine({ storage = globalThis.localStorage, prefix = 'dreamers:sync:', deviceId } = {}) {
+export function createSyncEngine({ storage = globalThis.localStorage, prefix = PREFIX + 'sync:', deviceId, shopId = activeShopId } = {}) {
+  const TABLE = 'shop_docs'
   const registry = new Map() // key -> ref
   const snap = new Map() // key -> Map(id -> json)
   let client = null
@@ -161,8 +164,8 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = '
       try {
         let rows
         while ((rows = Object.values(outbox)).length) {
-          const chunk = rows.slice(0, 500).map(({ collection, id, data, deleted, ord }) => ({ collection, id, data, deleted, ord: ord ?? 0, device }))
-          const { error } = await client.from('docs').upsert(chunk, { onConflict: 'collection,id' })
+          const chunk = rows.slice(0, 500).map(({ collection, id, data, deleted, ord }) => ({ shop_id: shopId, collection, id, data, deleted, ord: ord ?? 0, device }))
+          const { error } = await client.from(TABLE).upsert(chunk, { onConflict: 'shop_id,collection,id' })
           if (error) throw error
           let removed = 0
           chunk.forEach((r) => {
@@ -184,7 +187,7 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = '
   async function fetchSince(since) {
     const out = []
     for (let from = 0; ; from += PAGE) {
-      let q = client.from('docs').select('collection,id,data,deleted,ord,updated_at,device')
+      let q = client.from(TABLE).select('collection,id,data,deleted,ord,updated_at,device').eq('shop_id', shopId)
       if (since) q = q.gt('updated_at', since)
       const { data, error } = await q.order('updated_at', { ascending: true }).range(from, from + PAGE - 1)
       if (error) throw error
@@ -216,7 +219,7 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = '
 
   /** Máy chủ đã có dữ liệu chưa? (để hỏi người dùng lần kết nối đầu) */
   async function remoteCount(c = client) {
-    const { count, error } = await c.from('docs').select('id', { count: 'exact', head: true })
+    const { count, error } = await c.from(TABLE).select('id', { count: 'exact', head: true }).eq('shop_id', shopId)
     if (error) throw error
     return count || 0
   }
@@ -228,6 +231,7 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = '
    * mode 'push'   — đưa toàn bộ dữ liệu máy này lên máy chủ (máy đầu tiên)
    */
   async function start(supabase, mode = 'resume') {
+    if (!shopId) throw new Error('Chưa chọn quán')
     client = supabase
     status.state = 'connecting'
     status.error = ''
@@ -265,10 +269,10 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = '
     if (!client?.channel) return
     if (channel) client.removeChannel(channel)
     channel = client
-      .channel('docs-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, (payload) => {
+      .channel('shop-docs-' + shopId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLE, filter: `shop_id=eq.${shopId}` }, (payload) => {
         const r = payload.new
-        if (!r || r.device === device) return
+        if (!r || r.device === device || (r.shop_id && r.shop_id !== shopId)) return
         apply(r)
         markPulled([r])
       })
@@ -299,7 +303,7 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = '
 
   const hasStarted = () => storage.getItem(prefix + 'started') === '1'
 
-  return { register, start, stop, reset, flush, pull, remoteCount, hasStarted, status, registry, isArr, _apply: apply }
+  return { register, start, stop, reset, flush, pull, remoteCount, hasStarted, status, registry, isArr, shopId, pendingCount: () => Object.keys(outbox).length, _apply: apply }
 }
 
 // Bộ đồng bộ dùng chung cho app

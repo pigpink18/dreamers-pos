@@ -1,5 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { useAuth } from '../stores/auth'
+import { isLegacy, platformConfigured, activeShop } from '../tenant'
+import { boot } from '../boot'
 
 /**
  * Danh sách trang + menu.
@@ -7,6 +9,7 @@ import { useAuth } from '../stores/auth'
  * meta.public: không cần đăng nhập. meta.bare: không hiện khung menu.
  */
 const routes = [
+  { path: '/account', name: 'account', component: () => import('../views/AccountView.vue'), meta: { title: 'Tài khoản chủ quán', public: true, bare: true, hidden: true } },
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { title: 'Đăng nhập', public: true, bare: true, hidden: true } },
   { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Tổng quan', icon: 'dashboard', perm: 'dashboard.view' } },
   { path: '/pos', name: 'pos', component: () => import('../views/PosView.vue'), meta: { title: 'Bán hàng', icon: 'pos', full: true, perm: 'pos.sell' } },
@@ -37,11 +40,15 @@ export function firstAllowedPath() {
 
 // Chặn trang khi chưa đăng nhập / đang khoá / không có quyền
 router.beforeEach((to) => {
+  if (to.name === 'account') return true
+  // Hệ thống nhiều quán: máy chưa chọn quán, hoặc quán cần đăng nhập tài khoản / thiết lập -> màn Tài khoản
+  if (platformConfigured() && isLegacy) return { name: 'account' }
+  if (boot.state !== 'ready') return { name: 'account' }
   if (to.meta.public) return true
   const auth = useAuth()
   if (!auth.isAuthenticated) return { path: '/login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
   if (to.meta.perm && !auth.can(to.meta.perm)) return firstAllowedPath() === to.path ? true : firstAllowedPath()
   return true
 })
-router.afterEach((to) => (document.title = `${to.meta.title} · Dreamers Home & Coffee`))
+router.afterEach((to) => (document.title = `${to.meta.title} · ${activeShop?.name || 'Dreamers Home & Coffee'}`))
 export default router

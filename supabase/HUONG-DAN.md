@@ -1,6 +1,11 @@
-# Hướng dẫn cài máy chủ Supabase cho Dreamers POS
+# Hướng dẫn cài máy chủ cho hệ thống nhiều quán (Supabase)
 
-Làm 1 lần, khoảng 15 phút. Sau đó mọi máy (máy quầy, điện thoại của Lam, iPad…) dùng chung dữ liệu.
+Làm 1 lần, khoảng 20 phút. Sau đó:
+
+- **Chủ quán nào cũng tự đăng ký** trên link app, tạo quán của mình và dùng ngay.
+- **Mỗi quán có dữ liệu riêng hoàn toàn**: menu, phòng, hoá đơn, nhân viên, ca làm việc. Quán này không thể xem hay sửa dữ liệu quán khác. Máy chủ kiểm tra quyền trên từng dòng dữ liệu, kể cả khi ai đó tự gọi API.
+- **1 tài khoản có thể có nhiều quán** (chi nhánh), chuyển qua lại được.
+- **Mọi máy của cùng 1 quán** (máy quầy, điện thoại, iPad) dùng chung dữ liệu theo thời gian thực. Mất mạng vẫn bán được bình thường.
 
 ## 1. Tạo dự án Supabase
 
@@ -17,32 +22,55 @@ Làm 1 lần, khoảng 15 phút. Sau đó mọi máy (máy quầy, điện tho�
 2. Mở file `supabase/schema.sql` trong thư mục dự án, copy toàn bộ, dán vào rồi bấm **Run**.
 3. Thấy dòng *Success* là xong. Chạy lại lần nữa cũng không sao.
 
-## 3. Tạo tài khoản cho cửa hàng
+(File `schema-1-quan-cu.sql` là bản cũ cho 1 quán, không cần chạy.)
 
-Mọi máy của quán dùng chung **một** tài khoản này để kết nối. Nhân viên vẫn đăng nhập app bằng PIN như bình thường.
+## 3. Cho phép chủ quán tự đăng ký
 
-1. Mở **Authentication** → **Users** → **Add user** → **Create new user**.
-2. Nhập email (VD `dreamers.pos@gmail.com`) và một mật khẩu. Tick **Auto Confirm User**.
-3. **Quan trọng:** vào **Authentication** → **Sign In / Providers**, tắt **Allow new users to sign up**. Như vậy người lạ không tự tạo được tài khoản.
+Vào **Authentication**:
 
-## 4. Kết nối app
+1. **Sign In / Providers** → **Email**: bật **Enable Email provider** và **Allow new users to sign up**.
+2. Cũng ở mục Email: **tắt Confirm email**. Như vậy chủ quán đăng ký xong dùng ngay, không cần bấm link trong email.
+   - Nếu muốn bắt xác nhận email thì cứ để bật. App sẽ báo "Đã gửi email xác nhận" và chủ quán bấm link rồi quay lại đăng nhập.
+3. **URL Configuration** → **Site URL**: điền link app, VD `https://pigpink18.github.io/dreamers-pos/`.
 
-1. Vào **Project Settings** → **API**. Copy 2 thứ:
+## 4. Gắn máy chủ vào app trên GitHub
+
+1. Trong Supabase, vào **Project Settings** → **API** (hoặc **API Keys**). Copy 2 thứ:
    - **Project URL**, dạng `https://abcdxyz.supabase.co`
-   - **anon / public key**, hoặc **publishable key**. Đây là khoá công khai, dán vào app được.
-   - ⚠️ **Không** dùng khoá `service_role` / `secret` trong app.
-2. Trên **máy quầy** (máy có dữ liệu đúng):
-   - Mở app → **Cài đặt** → **Đồng bộ**, dán URL và key, nhập email/mật khẩu ở bước 3 rồi bấm **Kết nối**.
-   - Máy chủ đang trống nên app tự đưa toàn bộ dữ liệu lên.
-3. Trên **máy thứ 2, 3…**, làm giống hệt. Khi app hỏi, chọn **Dùng dữ liệu máy chủ**.
+   - **anon / public key**, hoặc **publishable key**. Đây là khoá công khai, đưa vào app được.
+   - ⚠️ **Không bao giờ** dùng khoá `service_role` / `secret` trong app.
+2. Trên GitHub, mở repo **dreamers-pos** → **Settings** → **Secrets and variables** → **Actions** → tab **Variables** → **New repository variable**. Tạo 2 biến:
+   - `VITE_SUPABASE_URL` = Project URL
+   - `VITE_SUPABASE_ANON_KEY` = anon key
+3. Vào tab **Actions** → **Deploy to GitHub Pages** → **Run workflow** (hoặc đẩy code mới lên). Khoảng 2 phút sau link app có máy chủ.
 
-Biểu tượng đám mây trên thanh trên cùng cho biết trạng thái:
+Khi chưa làm bước 4, app vẫn chạy **chế độ 1 máy** như cũ: dữ liệu chỉ nằm trên máy đó.
+
+## 5. Đưa quán Dreamers lên hệ thống (làm trên máy quầy, máy có dữ liệu đúng)
+
+1. Mở app. App tự chuyển tới màn **Tài khoản chủ quán**.
+2. Chọn **Đăng ký quán mới**, nhập email + mật khẩu của chủ quán.
+3. Ở form **Tạo quán mới**: điền tên quán, chọn **Dữ liệu đang có trên máy này** (menu, phòng, hoá đơn, nhân viên, mã PIN giữ nguyên) → **Tạo quán & mở**.
+4. Trên **máy thứ 2, 3…** của Dreamers: mở app → **Đăng nhập** bằng đúng email đó → bấm vào quán Dreamers. App tự tải dữ liệu quán về.
+   - Lần đầu mở quán trên 1 máy cần có mạng.
+
+## 6. Mời chủ quán khác dùng
+
+Gửi họ link app. Họ:
+
+1. Bấm **Đăng ký quán mới**, nhập email + mật khẩu của họ.
+2. Điền tên quán, địa chỉ, tên của họ và mã PIN 6 số → **Tạo quán & mở**.
+3. Quán mới **trống hoàn toàn**: họ tự thêm menu (Hàng hoá), phòng (Sơ đồ phòng), nhân viên (Cài đặt › Người dùng), tài khoản ngân hàng nhận chuyển khoản (Cài đặt › Thanh toán).
+
+Mở thêm chi nhánh: vào **Cài đặt** → **Tài khoản & đồng bộ** → **Tài khoản & đổi quán** → **Tạo quán mới**.
+
+Biểu tượng đám mây trên thanh trên cùng cho biết trạng thái đồng bộ:
 
 - **Xanh lá:** đang đồng bộ.
 - **Vàng:** mất mạng. App vẫn bán bình thường và sẽ tự gửi khi có mạng lại.
 - **Số nhỏ trên biểu tượng:** số thay đổi đang chờ gửi.
 
-## 5. Cài Supabase CLI (cho bước 6 và 7)
+## 7. Cài Supabase CLI (cho bước 8 và 9)
 
 Cần cho tính năng lịch Booking.com / Airbnb và hoá đơn điện tử thật. Chạy trên Mac, trong Terminal:
 
@@ -53,7 +81,7 @@ supabase login
 supabase link --project-ref abcdxyz      # "abcdxyz" là phần đầu của Project URL
 ```
 
-## 6. Kênh đặt phòng (Booking.com, Airbnb)
+## 8. Kênh đặt phòng (Booking.com, Airbnb)
 
 ```bash
 supabase functions deploy ical --no-verify-jwt
@@ -83,7 +111,7 @@ Lưu ý:
 - Nếu cần chống trùng tức thì hoặc đồng bộ cả giá, phải dùng channel manager trả phí.
 - Đơn OTA bị huỷ (biến mất khỏi lịch) sẽ tự chuyển sang "Đã huỷ" nếu khách chưa nhận phòng.
 
-## 7. Hoá đơn điện tử
+## 9. Hoá đơn điện tử
 
 1. Lúc chưa có hợp đồng: vào **Cài đặt** → **Hoá đơn điện tử**, chọn **Thử nghiệm** để chạy thử toàn bộ quy trình. Số hoá đơn lúc này là giả lập.
 2. Khi đã ký với MISA / Viettel / VNPT, nhà cung cấp sẽ cấp tài liệu API, tài khoản và môi trường thử nghiệm.
@@ -104,6 +132,18 @@ Lưu ý:
 
 ## Câu hỏi thường gặp
 
+- **Quán khác có xem được dữ liệu của mình không?**
+  - Không. Mỗi dòng dữ liệu gắn với 1 quán, và máy chủ chỉ trả dữ liệu cho tài khoản là thành viên của quán đó. Tài khoản khác gọi API đọc / ghi quán của mình đều bị chặn.
+- **Nhân viên có cần tài khoản email không?**
+  - Không. Chủ quán đăng nhập tài khoản 1 lần trên mỗi máy của quán. Nhân viên vào ca bằng mã PIN như trước.
+- **Chủ quán quên mật khẩu?**
+  - Vào Supabase → **Authentication** → **Users**, tìm email → **Send password recovery** (gửi email đặt lại mật khẩu).
+- **Đăng xuất trên 1 máy thì sao?**
+  - Dữ liệu các quán bị xoá khỏi máy đó, còn trên máy chủ thì vẫn nguyên. Đăng nhập lại là tải về.
+  - App không cho đăng xuất khi còn thay đổi chưa gửi lên máy chủ.
+- **Xoá 1 quán?**
+  - Hiện làm trong Supabase: **Table Editor** → bảng `shops` → xoá dòng của quán. Mọi dữ liệu của quán đó bị xoá theo.
+
 - **Mất mạng thì sao?**
   - App vẫn bán, nhận phòng, đóng ca bình thường. Mọi thay đổi nằm trong hàng đợi và tự gửi khi có mạng.
   - Nếu 2 máy cùng sửa **một** bản ghi lúc mất mạng (VD cùng sửa giá 1 món), bản gửi lên sau sẽ được giữ.
@@ -111,7 +151,7 @@ Lưu ý:
   - Bộ đếm luôn lấy số lớn nhất giữa các máy.
   - Chỉ có thể trùng khi 2 máy cùng mất mạng và cùng bán. Khi đó vẫn đủ hoá đơn, chỉ trùng số thứ tự hiển thị.
 - **Gói miễn phí của Supabase có đủ không?**
-  - Một quán café + homestay thường dùng ít hơn nhiều so với giới hạn gói miễn phí (500 MB cơ sở dữ liệu).
+  - Gói miễn phí có 500 MB cơ sở dữ liệu. Một quán café + homestay dùng vài MB mỗi năm, nên đủ cho khá nhiều quán lúc đầu. Khi đông quán hơn thì nâng lên gói Pro.
   - Dự án miễn phí có thể bị **tạm dừng nếu 7 ngày không có hoạt động**. Quán dùng hằng ngày thì không bị.
 - **Sao lưu?**
   - **Cài đặt** → **Dữ liệu** → **Xuất bản sao lưu** vẫn dùng được.

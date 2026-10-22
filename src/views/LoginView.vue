@@ -13,6 +13,7 @@ import { useShifts } from '../stores/shifts'
 import { useUi } from '../stores/ui'
 import { firstAllowedPath } from '../router'
 import logo from '../assets/image/logo.png'
+import { isLegacy } from '../tenant'
 
 const auth = useAuth()
 const settings = useSettings()
@@ -59,13 +60,17 @@ function createOwner() {
 }
 
 const roleColor = (u) => auth.roleById(u.roleId)?.color || '#888'
+// Logo con sóc chỉ dành cho Dreamers; quán khác hiện tên quán
+const shopName = computed(() => settings.shop.name || 'Quán của bạn')
+const showLogo = computed(() => isLegacy || /dreamers/i.test(settings.shop.name || ''))
 </script>
 
 <template>
   <div class="login">
     <!-- Cột thương hiệu -->
     <aside class="login__brand">
-      <img :src="logo" alt="Dreamers Home & Coffee" class="login__logo" />
+      <img v-if="showLogo" :src="logo" :alt="shopName" class="login__logo" />
+      <div v-else class="login__shopname"><Icon name="fa-mug-saucer" :size="26" /><span>{{ shopName }}</span></div>
       <div class="login__clock">
         <div class="login__time num">{{ time }}</div>
         <div class="login__date">{{ date }}</div>
@@ -80,7 +85,7 @@ const roleColor = (u) => auth.roleById(u.roleId)?.color || '#888'
     <main class="login__panel">
       <!-- Chưa có tài khoản nào -->
       <form v-if="!auth.activeUsers.length" class="login__setup" @submit.prevent="createOwner">
-        <h1>Chào mừng đến Dreamers</h1>
+        <h1>Chào mừng đến {{ shopName }}</h1>
         <p class="muted">Tạo tài khoản Chủ quán để bắt đầu. Sau đó bạn có thể thêm nhân viên trong Cài đặt.</p>
         <div class="field"><label>Tên của bạn</label><input class="input" v-model="setup.name" autofocus /></div>
         <div class="field"><label>Mã PIN (6 số)</label><input class="input num" v-model="setup.pin" inputmode="numeric" maxlength="6" type="password" /></div>
@@ -109,6 +114,7 @@ const roleColor = (u) => auth.roleById(u.roleId)?.color || '#888'
           </button>
         </div>
       </div>
+      <RouterLink v-if="!isLegacy" to="/account" class="login__account"><Icon name="fa-store" :size="14" /> {{ shopName }} · Tài khoản & đổi quán</RouterLink>
     </main>
   </div>
 </template>
@@ -133,13 +139,16 @@ const roleColor = (u) => auth.roleById(u.roleId)?.color || '#888'
     }
   }
   &__logo { width: 150px; filter: invert(1) sepia(.35) saturate(1.2) brightness(1.05); position: relative; z-index: 1; }
+  &__shopname { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; font: 700 26px/1.2 $font-display; letter-spacing: -0.02em; max-width: 90%; }
+  &__account { margin-top: 28px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: $text-2; text-decoration: none; padding: 8px 12px; border-radius: 999px;
+    &:hover { background: $fill; color: $text; } }
   &__clock { position: relative; z-index: 1; }
   &__time { font: 200 96px/1 $font-display; letter-spacing: -0.04em; }
   &__date { font-size: 18px; opacity: .8; margin-top: 8px; text-transform: capitalize; }
   &__shift { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; opacity: .85;
     padding: 8px 14px; border-radius: 999px; background: rgba(255, 255, 255, .08); align-self: flex-start; }
 
-  &__panel { display: flex; align-items: center; justify-content: center; padding: 40px 24px; background: $bg; }
+  &__panel { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; background: $bg; > * { width: 100%; max-width: 520px; } > .login__account { width: auto; } }
   &__users { width: 100%; max-width: 620px; text-align: center; h1 { font-size: 30px; } > p { margin: 6px 0 28px; } }
   &__pin { display: flex; flex-direction: column; align-items: center; gap: 6px; h2 { font-size: 22px; margin-top: 10px; } > p { margin: 0 0 22px; } .btn--plain { margin-top: 18px; } }
   &__setup { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; h1 { font-size: 26px; } p { margin: 0 0 6px; } }

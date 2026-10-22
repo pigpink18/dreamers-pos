@@ -30,12 +30,15 @@ Deno.serve(async (req) => {
     const room = u.searchParams.get('room') ?? ''
     const token = u.searchParams.get('token') ?? ''
     const exclude = u.searchParams.get('exclude') ?? ''
-    const { data: t } = await admin.from('ical_tokens').select('token').eq('room_id', room).maybeSingle()
-    if (!t || !token || t.token !== token) return new Response('Not found', { status: 404 })
+    // Mã bí mật xác định đúng quán + phòng (hệ thống nhiều quán: không lộ lịch của quán khác)
+    if (!token) return new Response('Not found', { status: 404 })
+    const { data: t } = await admin.from('shop_ical_tokens').select('shop_id,room_id').eq('token', token).maybeSingle()
+    if (!t || (room && t.room_id !== room)) return new Response('Not found', { status: 404 })
 
-    const { data: rows } = await admin.from('docs').select('data').eq('collection', 'bookings').eq('deleted', false).eq('data->>roomId', room)
+    const { data: rows } = await admin.from('shop_docs').select('data')
+      .eq('shop_id', t.shop_id).eq('collection', 'bookings').eq('deleted', false).eq('data->>roomId', t.room_id)
     const today = new Date().toISOString().slice(0, 10)
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dreamers Home & Coffee//POS//VI', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dreamers POS//Homestay//VI', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']
     for (const { data: b } of rows ?? []) {
       if (!b || b.status === 'cancelled' || b.checkOut <= today) continue
       if (exclude && b.channel === exclude) continue // không trả lại cho OTA lịch do chính OTA đó gửi sang
@@ -45,7 +48,7 @@ Deno.serve(async (req) => {
         `DTSTAMP:${stamp()}`,
         `DTSTART;VALUE=DATE:${ymd(b.checkIn)}`,
         `DTEND;VALUE=DATE:${ymd(b.checkOut)}`,
-        `SUMMARY:${esc('Dreamers - Not available')}`,
+        `SUMMARY:${esc('Not available')}`,
         'END:VEVENT',
       )
     }

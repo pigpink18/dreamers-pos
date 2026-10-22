@@ -1,4 +1,5 @@
 <script setup>
+import { transferTag } from '../tenant'
 /**
  * MÀN HÌNH BÁN HÀNG (POS)
  * - Trái: tìm & chọn hàng hoá
@@ -334,7 +335,7 @@ const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('')
           <div class="row" v-if="total"><span>Tiền thừa trả khách</span><b class="num" :class="change < 0 ? 'text-danger' : 'text-success'">{{ money(change) }}</b></div>
         </template>
 
-        <VietQrCard v-if="cart.method === 'transfer' && total > 0" :amount="total" :note="`${nextInvoiceCode} Dreamers`" :size="132" class="pos-qr" />
+        <VietQrCard v-if="cart.method === 'transfer' && total > 0" :amount="total" :note="`${nextInvoiceCode} ${transferTag(settingsStore.shop.name)}`.trim()" :size="132" class="pos-qr" />
 
         <input class="input input--sm" v-model="cart.note" placeholder="Ghi chú hoá đơn..." />
       </div>

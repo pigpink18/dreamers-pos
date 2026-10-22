@@ -2,6 +2,7 @@
 import { useRoute } from 'vue-router'
 import AppLayout from './layouts/AppLayout.vue'
 import ApprovalModal from './components/auth/ApprovalModal.vue'
+import AppOverlays from './components/ui/AppOverlays.vue'
 
 const route = useRoute()
 </script>
@@ -11,4 +12,5 @@ const route = useRoute()
   <RouterView v-if="route.meta.bare" />
   <AppLayout v-else-if="route.name" />
   <ApprovalModal />
+  <AppOverlays />
 </template>

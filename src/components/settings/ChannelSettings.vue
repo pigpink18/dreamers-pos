@@ -1,4 +1,5 @@
 <script setup>
+import { activeShopId } from '../../tenant'
 /** Kênh đặt phòng: đồng bộ lịch với Booking.com / Airbnb qua iCal */
 import { ref, reactive, computed, onMounted } from 'vue'
 import Icon from '../ui/Icon.vue'
@@ -49,12 +50,15 @@ async function loadExport() {
   const { getClient, getConfig } = await import('../../sync/connection')
   const c = getClient(), cfg = getConfig()
   if (!c || !cfg) return
+  if (!activeShopId) return
+  // mã bí mật riêng cho từng phòng của quán đang mở (máy chủ chỉ cho đọc mã của quán mình)
   const ids = rooms.rooms.map((r) => r.id)
-  let { data } = await c.from('ical_tokens').select('room_id,token').in('room_id', ids)
+  const q = () => c.from('shop_ical_tokens').select('room_id,token').eq('shop_id', activeShopId).in('room_id', ids)
+  let { data } = await q()
   const missing = ids.filter((id) => !data?.some((t) => t.room_id === id))
   if (missing.length) {
-    await c.from('ical_tokens').insert(missing.map((room_id) => ({ room_id })))
-    ;({ data } = await c.from('ical_tokens').select('room_id,token').in('room_id', ids))
+    await c.from('shop_ical_tokens').insert(missing.map((room_id) => ({ shop_id: activeShopId, room_id })))
+    ;({ data } = await q())
   }
   const base = cfg.url.replace(/\/$/, '') + '/functions/v1/ical'
   exportLinks.value = Object.fromEntries((data || []).map((t) => [t.room_id, `${base}?room=${encodeURIComponent(t.room_id)}&token=${t.token}`]))
