@@ -39,11 +39,15 @@ const selectedId = ref(auth.isLocked ? auth.session?.userId : null)
 const selected = computed(() => auth.userById(selectedId.value))
 const pad = ref(null)
 
+const pinMsg = ref('')
 function onPin(pin) {
+  if (auth.pinWait()) { pinMsg.value = `Nhập sai nhiều lần — thử lại sau ${auth.pinWait()} giây`; pad.value?.shake(); return }
   if (!auth.login(selectedId.value, pin)) {
+    pinMsg.value = auth.pinWait() ? `Nhập sai nhiều lần — thử lại sau ${auth.pinWait()} giây` : 'Mã PIN không đúng'
     pad.value?.shake()
     return
   }
+  pinMsg.value = ''
   const to = route.query.redirect && route.query.redirect !== '/login' ? route.query.redirect : firstAllowedPath()
   router.replace(to)
 }
@@ -99,7 +103,8 @@ const showLogo = computed(() => isLegacy || /dreamers/i.test(settings.shop.name 
         <h2>{{ auth.isLocked && auth.session?.userId === selected.id ? 'Màn hình đã khoá' : selected.name }}</h2>
         <p class="muted">{{ auth.isLocked && auth.session?.userId === selected.id ? `${selected.name} · nhập PIN để mở` : `${auth.roleById(selected.roleId)?.name} · nhập mã PIN` }}</p>
         <PinPad ref="pad" @complete="onPin" />
-        <button class="btn btn--plain" @click="selectedId = null"><Icon name="fa-arrow-right-arrow-left" :size="14" /> Đổi người dùng</button>
+        <p v-if="pinMsg" class="login__pinmsg">{{ pinMsg }}</p>
+        <button class="btn btn--plain" @click="selectedId = null; pinMsg = ''"><Icon name="fa-arrow-right-arrow-left" :size="14" /> Đổi người dùng</button>
       </div>
 
       <!-- Chọn người -->
@@ -140,6 +145,7 @@ const showLogo = computed(() => isLegacy || /dreamers/i.test(settings.shop.name 
   }
   &__logo { width: 150px; filter: invert(1) sepia(.35) saturate(1.2) brightness(1.05); position: relative; z-index: 1; }
   &__shopname { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; font: 700 26px/1.2 $font-display; letter-spacing: -0.02em; max-width: 90%; }
+  &__pinmsg { margin: 4px 0 0; font-size: 13px; color: $danger; text-align: center; }
   &__account { margin-top: 28px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: $text-2; text-decoration: none; padding: 8px 12px; border-radius: 999px;
     &:hover { background: $fill; color: $text; } }
   &__clock { position: relative; z-index: 1; }

@@ -14,10 +14,24 @@ const settings = useSettings()
 const ui = useUi()
 const f = reactive({ bin: '', account: '', holder: '', qrOnReceipt: true, ...settings.payment })
 
-function save() {
+// che bớt số tài khoản khi ghi nhật ký: 0865665603 -> ••••5603
+const mask = (a) => (a ? '••••' + String(a).slice(-4) : '(trống)')
+async function save() {
   if (f.account && !/^[0-9A-Za-z]{4,19}$/.test(f.account.replace(/\s/g, ''))) return ui.toast('Số tài khoản không hợp lệ', 'error')
   if (f.account && !f.bin) return ui.toast('Chọn ngân hàng', 'error')
-  Object.assign(settings.payment, { ...f, account: f.account.replace(/\s/g, ''), holder: f.holder.trim() })
+  const account = f.account.replace(/\s/g, '')
+  const old = settings.payment
+  // Đổi tài khoản nhận tiền = đổi nơi tiền khách chuyển vào -> CHỈ CHỦ QUÁN được duyệt (nhập PIN chủ quán)
+  if (account !== (old.account || '') || f.bin !== (old.bin || '')) {
+    const approver = await ui.approve({
+      perm: 'settings.manage',
+      reason: `Đổi tài khoản nhận chuyển khoản ${mask(old.account)} → ${mask(account)}`,
+      check: (u) => u.roleId === 'owner',
+    })
+    if (!approver) return
+    useAudit().log('settings.update', `Đổi tài khoản nhận chuyển khoản ${mask(old.account)} → ${mask(account)}`, { approvedBy: approver })
+  }
+  Object.assign(settings.payment, { ...f, account, holder: f.holder.trim() })
   useAudit().log('settings.update', 'Sửa tài khoản nhận chuyển khoản')
   ui.toast('Đã lưu tài khoản nhận chuyển khoản')
 }
@@ -27,6 +41,7 @@ function save() {
   <section class="card">
     <div class="card__header"><h3>Nhận chuyển khoản bằng VietQR</h3></div>
     <div class="card__body">
+      <p class="pay-guard"><Icon name="fa-shield-check" :size="14" /> Đổi số tài khoản cần mã PIN của <b>chủ quán</b> và được ghi vào Nhật ký thao tác.</p>
       <p class="muted" style="margin: 0 0 16px">Khi chọn "Chuyển khoản", màn hình bán hàng và hoá đơn sẽ hiện mã QR có sẵn <b>số tiền</b> và <b>mã hoá đơn</b>. Khách quét bằng bất kỳ app ngân hàng nào. Mã được tạo ngay trên máy, không cần mạng, không mất phí.</p>
       <form class="form-grid" @submit.prevent="save">
         <div class="field"><label>Ngân hàng</label>
@@ -51,4 +66,5 @@ function save() {
 
 <style lang="scss">
 .eyebrow-s { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
+.pay-guard { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--success); }
 </style>

@@ -173,6 +173,14 @@ async function wipeShop() {
   await new Promise((r) => setTimeout(r, 600))
   await sync.flush()
 }
+/** Quán Dreamers lỡ tạo trống: bổ sung menu + 7 phòng + tài khoản MB + nhân viên Lam (không ghi đè cái đã có) */
+async function loadDreamers() {
+  if (!(await ui.confirm('Thêm menu Dreamers, 7 phòng, tài khoản MB nhận chuyển khoản và nhân viên Lam vào quán này? Món / phòng đã có sẽ được giữ nguyên.', { okText: 'Thêm vào quán' }))) return
+  const { applyDreamersTemplate } = await import('../stores/seed')
+  applyDreamersTemplate()
+  useAudit().log('settings.update', 'Nạp menu & 7 phòng Dreamers')
+  ui.toast('Đã thêm menu và 7 phòng Dreamers')
+}
 async function wipe(withDemo) {
   const msg = withDemo
     ? 'Xoá hết và nạp dữ liệu mẫu (món, phòng, hoá đơn 150 ngày) để xem thử?'
@@ -389,6 +397,7 @@ async function wipe(withDemo) {
             <hr />
             <div class="flex" style="flex-wrap: wrap">
               <button v-if="isLegacy" class="btn btn--soft" @click="wipe(true)"><Icon name="sparkle" :size="15" />Nạp dữ liệu mẫu</button>
+              <button v-if="!isLegacy && /dreamers/i.test(settings.shop.name || '')" class="btn btn--soft" @click="loadDreamers"><Icon name="fa-mug-saucer" :size="15" />Nạp menu & 7 phòng Dreamers</button>
               <button class="btn btn--danger" @click="wipe(false)"><Icon name="trash" :size="15" />Xoá dữ liệu, bắt đầu dùng thật</button>
             </div>
             <p class="muted" style="margin-top: 10px; font-size: 13px">"Bắt đầu dùng thật" giữ lại người dùng, phân quyền, giao diện và thông tin cửa hàng.</p>

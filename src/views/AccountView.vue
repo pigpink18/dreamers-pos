@@ -6,10 +6,12 @@
  *  - Tạo quán mới (trống) hoặc đưa dữ liệu đang có trên máy này lên làm 1 quán
  * Mỗi quán có dữ liệu riêng hoàn toàn; nhân viên vào quán bằng PIN như trước.
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import Icon from '../components/ui/Icon.vue'
 import logo from '../assets/image/logo.png'
 import { useUi } from '../stores/ui'
+import { useAuth } from '../stores/auth'
+import { useRouter } from 'vue-router'
 import { LEGACY_SHOP, LEGACY_PAYMENT } from '../stores/settings'
 import { boot } from '../boot'
 import {
@@ -35,6 +37,12 @@ const creating = ref(false)
 const IMPORTED = LEGACY_PREFIX + 'importedTo'
 const legacyAvailable = computed(() => hasLegacyData() && !localStorage.getItem(IMPORTED))
 const form = reactive({ name: '', address: '', phone: '', ownerName: '', pin: '', pin2: '', source: 'blank' })
+// Quán tên "Dreamers…": cho chọn menu + 7 phòng Dreamers có sẵn trong app (dù máy này không có dữ liệu cũ)
+const isDreamersName = computed(() => /dreamers/i.test(form.name))
+watch(isDreamersName, (v) => {
+  if (v && form.source === 'blank') form.source = 'dreamers'
+  if (!v && form.source === 'dreamers') form.source = 'blank'
+})
 // Tóm tắt dữ liệu đang có trên máy (để chủ quán biết sẽ đưa gì lên)
 const legacySummary = computed(() => {
   const n = (k) => { try { const v = JSON.parse(localStorage.getItem(LEGACY_PREFIX + k)); return Array.isArray(v) ? v.length : 0 } catch { return 0 } }
@@ -61,7 +69,19 @@ async function load() {
     loading.value = false
   }
 }
-onMounted(load)
+// Máy đang mở quán: nhân viên không được vào trang tài khoản chủ quán (đăng xuất, tạo / đổi quán)
+// -> cần PIN của chủ quán hoặc quản lý. Máy chưa mở quán (đăng ký / đăng nhập lần đầu) thì không cần.
+const router = useRouter()
+onMounted(async () => {
+  if (activeShopId && boot.state === 'ready') {
+    const auth = useAuth()
+    if (auth.activeUsers.length) {
+      const ok = await ui.approve({ perm: 'settings.manage', reason: 'Mở trang tài khoản chủ quán' })
+      if (!ok) return router.replace('/login')
+    }
+  }
+  load()
+})
 
 function saveServer() {
   import('../sync/connection').then((m) => {
@@ -76,8 +96,12 @@ function saveServer() {
 
 async function submitCred() {
   if (!/^\S+@\S+\.\S+$/.test(cred.email.trim())) return ui.toast('Nhập email hợp lệ', 'error')
-  if (cred.password.length < 6) return ui.toast('Mật khẩu cần ít nhất 6 ký tự', 'error')
-  if (mode.value === 'signup' && cred.password !== cred.password2) return ui.toast('Hai lần nhập mật khẩu không khớp', 'error')
+  if (mode.value === 'signup') {
+    // tài khoản chủ quán giữ cả dữ liệu lẫn quyền đổi tài khoản nhận tiền -> mật khẩu phải đủ mạnh
+    if (cred.password.length < 8 || !/[A-Za-z]/.test(cred.password) || !/\d/.test(cred.password))
+      return ui.toast('Mật khẩu cần ít nhất 8 ký tự, có cả chữ và số', 'error')
+    if (cred.password !== cred.password2) return ui.toast('Hai lần nhập mật khẩu không khớp', 'error')
+  } else if (cred.password.length < 6) return ui.toast('Nhập mật khẩu', 'error')
   busy.value = true
   try {
     if (mode.value === 'signin') await conn.value.signIn(cred.email, cred.password)
@@ -116,7 +140,7 @@ function reopen() {
 async function createShop() {
   const f = form
   if (!f.name.trim()) return ui.toast('Nhập tên quán', 'error')
-  const blank = f.source === 'blank'
+  const blank = f.source !== 'legacy'
   if (blank) {
     if (!f.ownerName.trim()) return ui.toast('Nhập tên của bạn (hiện ở màn hình chọn người)', 'error')
     if (!/^\d{6}$/.test(f.pin)) return ui.toast('Mã PIN gồm đúng 6 chữ số', 'error')
@@ -127,7 +151,7 @@ async function createShop() {
     const shop = await conn.value.createShop(f.name)
     const p = shopPrefix(shop.id)
     if (blank) {
-      localStorage.setItem(p + 'init', JSON.stringify({ name: f.name.trim(), address: f.address, phone: f.phone, ownerName: f.ownerName.trim(), pin: f.pin }))
+      localStorage.setItem(p + 'init', JSON.stringify({ name: f.name.trim(), address: f.address, phone: f.phone, ownerName: f.ownerName.trim(), pin: f.pin, template: f.source === 'dreamers' ? 'dreamers' : '' }))
     } else {
       // Đưa dữ liệu đang có trên máy này (menu, phòng, hoá đơn, nhân viên…) sang quán mới
       copyLegacyInto(shop.id)
@@ -151,16 +175,19 @@ async function createShop() {
   }
 }
 
-async function logout() {
+async function logout(everywhere = false) {
   // Còn thay đổi chưa gửi lên máy chủ -> không cho đăng xuất (đăng xuất sẽ xoá dữ liệu quán trên máy này)
   if (activeShopId) {
     const { sync } = await import('../sync/engine')
     const n = sync.pendingCount()
     if (n) return ui.toast(`Còn ${n} thay đổi chưa gửi lên máy chủ — kết nối mạng, chờ đồng bộ xong rồi đăng xuất`, 'error')
   }
-  if (!(await ui.confirm('Đăng xuất tài khoản trên máy này? Dữ liệu các quán sẽ được xoá khỏi máy này (vẫn còn nguyên trên máy chủ, đăng nhập lại là có).', { okText: 'Đăng xuất', danger: true }))) return
+  const msg = everywhere
+    ? 'Đăng xuất tài khoản trên TẤT CẢ các máy (dùng khi mất điện thoại hoặc nghi lộ mật khẩu)? Mọi máy phải đăng nhập lại. Dữ liệu vẫn còn nguyên trên máy chủ.'
+    : 'Đăng xuất tài khoản trên máy này? Dữ liệu các quán sẽ được xoá khỏi máy này (vẫn còn nguyên trên máy chủ, đăng nhập lại là có).'
+  if (!(await ui.confirm(msg, { okText: everywhere ? 'Đăng xuất mọi máy' : 'Đăng xuất', danger: true }))) return
   busy.value = true
-  await conn.value.signOut()
+  await conn.value.signOut(everywhere ? 'global' : 'local')
   shops.value.forEach((s) => forgetShopData(s.id))
   if (activeShopId) forgetShopData(activeShopId)
   setActiveShop(null)
@@ -239,7 +266,7 @@ function switchMode() {
             </label>
             <label class="ios-field ios-field--pw">
               <span>Mật khẩu</span>
-              <input v-model="cred.password" name="password" :type="showPw ? 'text' : 'password'" :autocomplete="mode === 'signin' ? 'current-password' : 'new-password'" :placeholder="mode === 'signup' ? 'Ít nhất 6 ký tự' : ''" />
+              <input v-model="cred.password" name="password" :type="showPw ? 'text' : 'password'" :autocomplete="mode === 'signin' ? 'current-password' : 'new-password'" :placeholder="mode === 'signup' ? 'Ít nhất 8 ký tự, có chữ và số' : ''" />
               <button type="button" class="ios-field__eye" :aria-label="showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" @click="showPw = !showPw"><Icon :name="showPw ? 'fa-eye-slash' : 'fa-eye'" :size="16" /></button>
             </label>
             <label v-if="mode === 'signup'" class="ios-field">
@@ -283,14 +310,18 @@ function switchMode() {
             <label class="ios-field"><span>Điện thoại <i>· không bắt buộc</i></span><input v-model="form.phone" name="phone" type="tel" inputmode="tel" /></label>
           </div>
 
-          <template v-if="legacyAvailable">
+          <template v-if="legacyAvailable || isDreamersName">
             <p class="ios-caption">Dữ liệu ban đầu</p>
             <div class="ios-group src-pick" role="radiogroup">
               <button type="button" role="radio" :aria-checked="form.source === 'blank'" :class="{ active: form.source === 'blank' }" @click="form.source = 'blank'">
                 <span class="src-pick__radio"></span>
                 <span><b>Quán trống</b><small>Tự thêm menu, phòng, nhân viên</small></span>
               </button>
-              <button type="button" role="radio" :aria-checked="form.source === 'legacy'" :class="{ active: form.source === 'legacy' }" @click="form.source = 'legacy'">
+              <button v-if="isDreamersName" type="button" role="radio" :aria-checked="form.source === 'dreamers'" :class="{ active: form.source === 'dreamers' }" @click="form.source = 'dreamers'">
+                <span class="src-pick__radio"></span>
+                <span><b>Menu & 7 phòng Dreamers</b><small>Có sẵn trong app: toàn bộ món, 7 phòng (Mây, Nắng, Gió…), tài khoản MB nhận chuyển khoản, nhân viên Lam</small></span>
+              </button>
+              <button v-if="legacyAvailable" type="button" role="radio" :aria-checked="form.source === 'legacy'" :class="{ active: form.source === 'legacy' }" @click="form.source = 'legacy'">
                 <span class="src-pick__radio"></span>
                 <span>
                   <b>Dữ liệu đang có trên máy này</b>
@@ -300,7 +331,7 @@ function switchMode() {
             </div>
           </template>
 
-          <template v-if="form.source === 'blank'">
+          <template v-if="form.source !== 'legacy'">
             <p class="ios-caption">Chủ quán</p>
             <div class="ios-group">
               <label class="ios-field"><span>Tên của bạn</span><input v-model="form.ownerName" name="ownerName" placeholder="Hiện ở màn hình chọn người" /></label>
@@ -322,8 +353,11 @@ function switchMode() {
         <span class="acct__avatar">{{ initial }}</span>
         <span class="acct__email">{{ email }}</span>
         <button v-if="activeShopId && boot.state === 'ready'" class="acct__link" @click="open(activeShop)">Quay lại quán</button>
-        <button class="acct__link" :disabled="busy" @click="logout">Đăng xuất</button>
+        <button class="acct__link" :disabled="busy" @click="logout()">Đăng xuất</button>
       </footer>
+      <p v-if="session && view !== 'loading'" class="acct__legal">
+        <button class="acct__link acct__link--muted" :disabled="busy" @click="logout(true)"><Icon name="fa-right-from-bracket" :size="12" /> Đăng xuất khỏi mọi máy</button>
+      </p>
       <p v-else class="acct__legal"><Icon name="fa-lock" :size="12" /> Dữ liệu mỗi quán tách biệt · Nhân viên vào ca bằng mã PIN</p>
     </main>
   </div>
@@ -336,9 +370,8 @@ function switchMode() {
   position: fixed; inset: 0; z-index: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; justify-content: center; align-items: flex-start;
   padding: max(40px, 7vh) 20px calc(32px + var(--safe-bottom));
-  background:
-    radial-gradient(900px 420px at 50% -120px, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%),
-    var(--bg);
+  // nền hoa văn của app (đặt trên body) vẫn hiện, phủ thêm quầng sáng màu cà phê phía trên
+  background: radial-gradient(900px 420px at 50% -120px, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%);
   color: $text;
   -webkit-font-smoothing: antialiased;
 }
@@ -397,6 +430,7 @@ function switchMode() {
   border: 0; background: none; padding: 4px 2px; font: inherit; font-weight: 600; color: $primary; cursor: pointer; border-radius: 6px;
   &:hover { text-decoration: underline; text-underline-offset: 3px; }
   &:disabled { opacity: .5; }
+  &--muted { color: $text-muted; font-weight: 500; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
 }
 .acct__back {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin: 0 0 2px -4px; padding: 6px 8px; border: 0; border-radius: 8px;

@@ -118,8 +118,10 @@ Lưu ý:
 3. Lưu thông tin bí mật lên máy chủ. Mật khẩu chỉ nằm trên máy chủ, không nằm trên máy bán hàng.
 
    ```bash
-   supabase secrets set EINV_USERNAME=... EINV_PASSWORD=... EINV_BASE_URL=...
+   supabase secrets set EINV_USERNAME=... EINV_PASSWORD=... EINV_BASE_URL=... EINV_SHOP_IDS=<mã quán Dreamers>
    ```
+
+   `EINV_SHOP_IDS` là mã của quán được dùng tài khoản HĐĐT này (xem trong Supabase › Table Editor › bảng `shops`, cột `id`). Quán khác trên hệ thống **không** dùng được mã số thuế của Dreamers.
 
 4. Điền phần `TODO` trong `supabase/functions/einvoice/index.ts` theo tài liệu của nhà cung cấp. App đã chuẩn hoá sẵn dữ liệu: người bán, người mua, từng dòng hàng, thuế, tổng tiền.
 5. Triển khai:
@@ -129,6 +131,31 @@ Lưu ý:
    ```
 
 6. Trong app, chọn nhà cung cấp, điền mã số thuế, mẫu số và ký hiệu. Thử với môi trường thử nghiệm của nhà cung cấp trước khi bật **Tự xuất HĐĐT**.
+
+## Bảo mật: việc cần làm trước khi mở link cho nhiều người
+
+App đã tự bảo vệ:
+
+- **Tách dữ liệu từng quán ngay trên máy chủ (RLS):** quán khác không đọc, không sửa được dữ liệu của mình, kể cả khi tự gọi API.
+- **Mã PIN:** sai 5 lần thì khoá nhập 30 giây, sai tiếp thì khoá lâu dần (tối đa 15 phút). Mỗi lần bị khoá đều ghi vào Nhật ký.
+- **Đổi tài khoản ngân hàng nhận chuyển khoản:** bắt buộc nhập PIN **chủ quán** và ghi Nhật ký (số cũ → số mới).
+- **Trang tài khoản chủ quán** (đăng xuất, tạo / đổi quán): cần PIN chủ quán hoặc quản lý. Nhân viên không vào được.
+- **Mật khẩu chủ quán:** tối thiểu 8 ký tự, có cả chữ và số.
+- **Mất điện thoại:** vào trang tài khoản → **Đăng xuất khỏi mọi máy**.
+- **Hoá đơn điện tử:** chỉ quán nằm trong `EINV_SHOP_IDS` mới dùng được tài khoản HĐĐT.
+- **Trình duyệt:** chỉ chạy mã của chính app và chỉ gửi dữ liệu tới máy chủ Supabase (Content-Security-Policy). Trang khác không nhúng được app để lừa bấm.
+- **App không giữ tiền:** mã QR chỉ hiện số tài khoản của quán, tiền khách chuyển thẳng vào ngân hàng của quán. App không có quyền rút hay chuyển tiền.
+
+**Chị cần tự bật / làm (quan trọng nhất là bật 2 lớp bảo mật):**
+
+1. **Bật xác thực 2 lớp (2FA) cho GitHub và Supabase.** Ai vào được tài khoản GitHub thì sửa được code app, ai vào được Supabase thì xem được dữ liệu mọi quán. Đây là điểm cần bảo vệ nhất.
+   - GitHub: **Settings** → **Password and authentication** → **Enable two-factor authentication**.
+   - Supabase: avatar → **Account preferences** → **Multi-factor authentication**.
+2. **Supabase → Authentication → Sign In / Providers → Email:** đặt **Minimum password length = 8** và **Password requirements = Letters and digits**.
+3. **Supabase → Authentication → Rate Limits:** giữ mặc định (đã chặn dò mật khẩu và đăng ký hàng loạt). Nếu sau này bị spam đăng ký thì bật **Attack Protection → CAPTCHA**.
+4. **Không bao giờ** đưa khoá `service_role` / `secret` hay mật khẩu database cho ai, không dán vào app hay GitHub.
+5. Mã token GitHub (`ghp_…`) cũng là chìa khoá. Lỡ lộ thì vào **github.com/settings/tokens** xoá ngay.
+6. Mỗi quán nên sao lưu định kỳ: **Cài đặt** → **Dữ liệu** → **Sao lưu**.
 
 ## Câu hỏi thường gặp
 

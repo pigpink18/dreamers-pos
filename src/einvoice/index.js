@@ -93,7 +93,8 @@ export async function issueEinvoice(invoiceId, buyer = null) {
       const { getClient } = await import('../sync/connection')
       const client = getClient()
       if (!client) throw new Error('Cần kết nối máy chủ (Cài đặt › Đồng bộ) để xuất HĐĐT thật')
-      const { data, error } = await client.functions.invoke('einvoice', { body: { action: 'issue', provider: cfg.provider, payload } })
+      const { activeShopId } = await import('../tenant')
+      const { data, error } = await client.functions.invoke('einvoice', { body: { action: 'issue', provider: cfg.provider, payload, shopId: activeShopId } })
       if (error) throw new Error(error.message || 'Máy chủ HĐĐT báo lỗi')
       if (data?.error) throw new Error(data.error)
       res = data

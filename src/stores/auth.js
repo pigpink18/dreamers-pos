@@ -7,7 +7,8 @@
  *   Khi có backend thật, phần xác thực phải chuyển lên server.
  */
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
+import { nsKey } from '../tenant'
+import { computed, ref } from 'vue'
 import { useStorage } from '../utils/storage'
 import { uid } from '../utils/format'
 import { useAudit } from './audit'
@@ -103,13 +104,38 @@ export const useAuth = defineStore('auth', () => {
   const can = (perm) => userCan(user.value, perm)
   const maxDiscount = computed(() => role.value?.maxDiscount ?? 0)
 
+  // ---------- Chống dò PIN: sai 5 lần -> khoá tạm 30 giây, càng sai càng khoá lâu (tối đa 15 phút) ----------
+  const GUARD = nsKey('pinGuard')
+  const readGuard = () => { try { return JSON.parse(localStorage.getItem(GUARD)) || { fails: 0, until: 0 } } catch { return { fails: 0, until: 0 } } }
+  const pinGuard = ref(readGuard())
+  /** Số giây còn phải chờ trước khi được nhập PIN tiếp (0 = nhập được) */
+  const pinWait = () => Math.max(0, Math.ceil((pinGuard.value.until - Date.now()) / 1000))
+  function pinFailed(who) {
+    const g = { ...pinGuard.value, fails: pinGuard.value.fails + 1 }
+    if (g.fails >= 5) {
+      const secs = Math.min(900, 30 * 2 ** Math.floor((g.fails - 5) / 5))
+      g.until = Date.now() + secs * 1000
+      useAudit().log('login.fail', `Nhập sai PIN ${g.fails} lần liên tiếp (${who}) — khoá nhập PIN ${secs} giây`)
+    }
+    pinGuard.value = g
+    localStorage.setItem(GUARD, JSON.stringify(g))
+  }
+  function pinOk() {
+    if (!pinGuard.value.fails) return
+    pinGuard.value = { fails: 0, until: 0 }
+    localStorage.removeItem(GUARD)
+  }
+
   // ---------- Đăng nhập / khoá / đăng xuất ----------
   function login(userId, pin) {
+    if (pinWait()) return false
     const u = userById(userId)
     if (!u || u.active === false || u.pinHash !== hashPin(pin)) {
       useAudit().log('login.fail', `Nhập sai PIN: ${u?.name || '?'}`, { user: u })
+      pinFailed(u?.name || '?')
       return false
     }
+    pinOk()
     const switching = session.value && session.value.userId !== u.id
     session.value = { userId: u.id, locked: false, since: new Date().toISOString() }
     useAudit().log(switching ? 'login.switch' : 'login', `${u.name} đăng nhập`)
@@ -126,9 +152,12 @@ export const useAuth = defineStore('auth', () => {
   }
 
   /** Tìm người có PIN này và (tuỳ chọn) thoả điều kiện — dùng cho "quản lý duyệt" */
-  function findByPin(pin, check = () => true) {
+  function findByPin(pin, check = () => true, { guard = false } = {}) {
+    if (guard && pinWait()) return null
     const h = hashPin(pin)
-    return activeUsers.value.find((u) => u.pinHash === h && check(u)) || null
+    const u = activeUsers.value.find((x) => x.pinHash === h && check(x)) || null
+    if (guard) { if (activeUsers.value.some((x) => x.pinHash === h)) pinOk(); else pinFailed('duyệt thao tác') }
+    return u
   }
 
   // ---------- Quản lý người dùng ----------
@@ -196,7 +225,7 @@ export const useAuth = defineStore('auth', () => {
 
   return {
     users, roles, session, user, role, isLocked, isAuthenticated, activeUsers, maxDiscount,
-    roleById, userById, userCan, can, login, lock, logout, findByPin, pinTaken, saveUser, setActive,
+    roleById, userById, userCan, can, login, lock, logout, findByPin, pinTaken, saveUser, setActive, pinWait,
     saveRole, removeRole, setupOwner,
   }
 })

@@ -13,9 +13,10 @@ const error = ref('')
 
 function onPin(pin) {
   const st = ui.approvalState
-  const u = auth.findByPin(pin, st.ok)
+  if (auth.pinWait()) { error.value = `Nhập sai nhiều lần — thử lại sau ${auth.pinWait()} giây`; pad.value?.shake(); return }
+  const u = auth.findByPin(pin, st.ok, { guard: true })
   if (!u) {
-    error.value = auth.findByPin(pin) ? 'Người này không có quyền duyệt thao tác này' : 'Mã PIN không đúng'
+    error.value = auth.findByPin(pin) ? 'Người này không có quyền duyệt thao tác này' : auth.pinWait() ? `Nhập sai nhiều lần — thử lại sau ${auth.pinWait()} giây` : 'Mã PIN không đúng'
     pad.value?.shake()
     return
   }

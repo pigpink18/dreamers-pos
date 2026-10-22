@@ -2,7 +2,7 @@
  * Dữ liệu mẫu để app có số liệu báo cáo ngay khi mở lần đầu.
  * Xoá được trong trang Cài đặt.
  */
-import { useSettings } from './settings'
+import { useSettings, LEGACY_SHOP, LEGACY_PAYMENT } from './settings'
 import { useProducts } from './products'
 import { useCustomers } from './customers'
 import { useInvoices } from './invoices'
@@ -158,6 +158,28 @@ export function ensureRooms() {
   const rooms = useRooms()
   if (!rooms.rooms.length) withoutAudit(() => ROOMS.forEach(([name, type, floor, price, capacity]) => rooms.saveRoom({ name, type, floor, price, capacity })))
   localStorage.setItem(key, '1')
+}
+
+/**
+ * MẪU DREAMERS cho quán trên hệ thống: menu thật, 7 phòng, tài khoản MB nhận chuyển khoản, địa chỉ quán, nhân viên Lam.
+ * Chỉ BỔ SUNG phần còn thiếu, không ghi đè món / phòng / thông tin đã có. Dùng được cả với quán đã tạo trống.
+ */
+export function applyDreamersTemplate() {
+  localStorage.removeItem(nsKey('menuVersion'))
+  localStorage.removeItem(nsKey('roomsVersion'))
+  ensureMenu()
+  ensureRooms()
+  localStorage.setItem(nsKey('roomTypeVi'), '1')
+  withoutAudit(() => {
+    const settings = useSettings()
+    if (!settings.payment.account) Object.assign(settings.payment, LEGACY_PAYMENT)
+    ;['address', 'phone', 'footer'].forEach((k) => { if (!settings.shop[k] || (k === 'footer' && /hẹn gặp lại!$/.test(settings.shop.footer))) settings.shop[k] = LEGACY_SHOP[k] })
+    const auth = useAuth()
+    DEMO_USERS.filter(([, roleId]) => roleId !== 'owner').forEach(([name, roleId, pin]) => {
+      if (!auth.users.some((u) => u.name.toLowerCase() === name.toLowerCase()))
+        auth.users.push({ id: 'u' + Date.now().toString(36) + name.length, name, roleId, pinHash: hashPin(pin), active: true, createdAt: new Date().toISOString() })
+    })
+  })
 }
 
 /** App mới hoàn toàn: 2 tài khoản Yến (chủ quán), Lam (nhân viên), menu thật và 7 phòng; chưa có khách hay hoá đơn */

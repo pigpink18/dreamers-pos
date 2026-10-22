@@ -90,10 +90,11 @@ export async function signUp(email, password) {
   return data.session ? { session: data.session } : { needConfirm: true }
 }
 
-export async function signOut() {
+/** scope 'global' = đăng xuất tài khoản trên MỌI máy (khi mất điện thoại / lộ mật khẩu) */
+export async function signOut(scope = 'local') {
   sync.stop()
   const c = getClient()
-  if (c) await c.auth.signOut().catch(() => {})
+  if (c) await c.auth.signOut({ scope }).catch(() => {})
 }
 
 /** Các quán tài khoản này được vào (máy chủ chỉ trả quán mình là thành viên) */

@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { hasData, clearAll, markSeeded } from './utils/storage'
-import { seedDemo, seedFresh, seedBlankShop, ensureMenu, ensureRooms, viRoomTypes } from './stores/seed'
+import { seedDemo, seedFresh, seedBlankShop, applyDreamersTemplate, ensureMenu, ensureRooms, viRoomTypes } from './stores/seed'
 import { useAppearance } from './stores/theme'
 import { useAllStores } from './stores/all'
 import { installRipple } from './utils/motion'
@@ -16,6 +16,15 @@ import './assets/font-awesome-6-pro/css/light.min.css'
 import '@vuepic/vue-datepicker/dist/main.css'
 import 'vue-multiselect/dist/vue-multiselect.css'
 import './styles/main.scss'
+
+// Không cho trang khác nhúng app vào khung (iframe) để lừa người dùng bấm / nhập PIN:
+// bị nhúng thì KHÔNG chạy app, chỉ hiện nút mở app ở cửa sổ riêng
+const framed = (() => { try { return window.top !== window.self } catch { return true } })()
+if (framed) {
+  document.getElementById('app').innerHTML =
+    '<p style="font:15px system-ui;text-align:center;margin-top:40vh"><a href="' + location.href.replace(/"/g, '') + '" target="_blank" rel="noopener">Mở Dreamers POS trong cửa sổ riêng</a></p>'
+  throw new Error('Dreamers POS không chạy bên trong khung của trang khác')
+}
 
 installPwaUpdate() // có bản mới thì tự cập nhật
 
@@ -44,8 +53,10 @@ async function bootShop() {
   try { init = JSON.parse(localStorage.getItem(nsKey('init'))) } catch { /* bỏ qua */ }
   if (init) {
     // Quán vừa tạo trên máy này: quán trống (chủ quán + PIN) hoặc dữ liệu cũ đã chép sang lúc tạo
-    if (!init.importLegacy) seedBlankShop(init)
-    else markSeeded()
+    if (!init.importLegacy) {
+      seedBlankShop(init)
+      if (init.template === 'dreamers') applyDreamersTemplate() // menu + 7 phòng Dreamers có sẵn trong app
+    } else markSeeded()
     localStorage.removeItem(nsKey('init'))
     return 'push'
   }
