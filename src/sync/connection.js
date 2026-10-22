@@ -13,8 +13,10 @@ import { activeShopId } from '../tenant'
 const PLATFORM = 'dreamers:platform'
 let client = null
 
-const ENV_URL = import.meta.env.VITE_SUPABASE_URL || ''
-const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+// Chấp nhận cả khi lỡ dán nguyên dòng "TEN_BIEN=giá trị" hoặc có dấu ngoặc / khoảng trắng
+const clean = (v) => String(v || '').trim().replace(/^[A-Z0-9_]+\s*=\s*/, '').replace(/^["']|["']$/g, '').trim().replace(/\/$/, '')
+const ENV_URL = clean(import.meta.env.VITE_SUPABASE_URL)
+const ENV_KEY = clean(import.meta.env.VITE_SUPABASE_ANON_KEY)
 
 /** Cấu hình máy chủ: { url, key, fromEnv } hoặc null nếu chưa cài */
 export function getPlatform() {

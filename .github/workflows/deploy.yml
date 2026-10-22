@@ -29,8 +29,12 @@ jobs:
         env:
           # Máy chủ Supabase dùng chung cho mọi quán (GitHub › Settings › Secrets and variables › Actions › Variables).
           # Để trống thì app chạy chế độ 1 máy như cũ.
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # đọc ở tab Variables, nếu không có thì đọc ở tab Secrets
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Kiểm tra đã gắn máy chủ
+        run: |
+          if grep -rq "supabase.co" dist/assets; then echo "✅ Đã gắn máy chủ Supabase vào app"; else echo "::warning::Chưa có VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — app đang chạy chế độ 1 máy"; fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
