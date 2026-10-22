@@ -11,8 +11,8 @@ import Icon from '../components/ui/Icon.vue'
 import WelcomeSplash from '../components/account/WelcomeSplash.vue'
 import logo from '../assets/image/logo.png'
 import { useUi } from '../stores/ui'
-import { useAuth } from '../stores/auth'
-import { useRouter } from 'vue-router'
+import { useAuth, hashPin } from '../stores/auth'
+import { useRouter, useRoute } from 'vue-router'
 import { LEGACY_SHOP, LEGACY_PAYMENT } from '../stores/settings'
 import { boot } from '../boot'
 import {
@@ -35,9 +35,29 @@ const mode = ref('signin') // signin | signup
 const cred = reactive({ email: '', password: '', password2: '' })
 
 const creating = ref(false)
+// ---- Link mời: #/account?invite=<mã> -> giữ lại tới khi đăng nhập / đăng ký xong thì nhận lời mời ----
+const INVITE = 'dreamers:invite'
+const route = useRoute()
+if (route.query.invite) { try { sessionStorage.setItem(INVITE, String(route.query.invite)) } catch { /* bỏ qua */ } }
+const pendingInvite = ref((() => { try { return sessionStorage.getItem(INVITE) } catch { return null } })())
+const role = ref(null) // vai trò trên máy chủ ở quán đang mở
+async function takeInvite() {
+  if (!pendingInvite.value || !session.value) return null
+  try {
+    const shopId = await conn.value.acceptInvite(pendingInvite.value)
+    ui.toast('Đã nhận lời mời vào quán')
+    return shopId
+  } catch (e) {
+    ui.toast(e.message, 'error')
+    return null
+  } finally {
+    pendingInvite.value = null
+    try { sessionStorage.removeItem(INVITE) } catch { /* bỏ qua */ }
+  }
+}
 const IMPORTED = LEGACY_PREFIX + 'importedTo'
 const legacyAvailable = computed(() => hasLegacyData() && !localStorage.getItem(IMPORTED))
-const form = reactive({ name: '', address: '', phone: '', ownerName: '', pin: '', pin2: '', source: 'blank' })
+const form = reactive({ name: '', address: '', phone: '', ownerName: '', pin: '', pin2: '', source: 'blank', legacyPin: '' })
 // Quán tên "Dreamers…": cho chọn menu + 7 phòng Dreamers có sẵn trong app (dù máy này không có dữ liệu cũ)
 const isDreamersName = computed(() => /dreamers/i.test(form.name))
 watch(isDreamersName, (v) => {
@@ -59,11 +79,16 @@ async function load() {
     if (!configured.value) return
     conn.value = await import('../sync/connection')
     session.value = await conn.value.getSession()
+    const invitedShop = await takeInvite()
     // không để vòng quay chờ mãi khi mất mạng
     if (session.value) shops.value = await Promise.race([conn.value.listShops(), new Promise((_, rej) => setTimeout(() => rej(new Error('Không kết nối được máy chủ — kiểm tra mạng')), 12000))])
     // máy đang mở 1 quán và tài khoản vẫn còn quyền -> cập nhật tên quán đang lưu
     const cur = shops.value.find((s) => s.id === activeShopId)
     if (cur && cur.name !== activeShop?.name) setActiveShop(cur)
+    if (cur) role.value = await conn.value.myRole(cur.id).catch(() => null)
+    // vừa nhận lời mời -> mở luôn quán đó
+    const inv = invitedShop && shops.value.find((x) => x.id === invitedShop)
+    if (inv) return open(inv)
   } catch (e) {
     err.value = e.message || String(e)
   } finally {
@@ -74,14 +99,16 @@ async function load() {
 // -> cần PIN của chủ quán hoặc quản lý. Máy chưa mở quán (đăng ký / đăng nhập lần đầu) thì không cần.
 const router = useRouter()
 onMounted(async () => {
-  if (activeShopId && boot.state === 'ready') {
+  await load()
+  // Chỉ tài khoản chủ quán / quản lý mới cần chặn (đăng xuất, tạo / đổi quán của chủ). Nhân viên đăng nhập
+  // bằng email của chính họ thì tự quản lý tài khoản của mình được.
+  if (activeShopId && boot.state === 'ready' && session.value && role.value !== 'staff') {
     const auth = useAuth()
     if (auth.activeUsers.length) {
       const ok = await ui.approve({ perm: 'settings.manage', reason: 'Mở trang tài khoản chủ quán' })
       if (!ok) return router.replace('/login')
     }
   }
-  load()
 })
 
 function saveServer() {
@@ -118,8 +145,9 @@ async function submitCred() {
     cred.password = cred.password2 = ''
     // máy đang chờ đăng nhập để tải dữ liệu quán -> tải lại để mở quán
     if (activeShopId && boot.state !== 'ready') return reopen()
+    const hadInvite = !!pendingInvite.value
     await load()
-    if (!shops.value.length) creating.value = true
+    if (!shops.value.length && !hadInvite) creating.value = true
   } catch (e) {
     ui.toast(e.message, 'error')
   } finally {
@@ -142,6 +170,18 @@ async function createShop() {
   const f = form
   if (!f.name.trim()) return ui.toast('Nhập tên quán', 'error')
   const blank = f.source !== 'legacy'
+  // Đưa dữ liệu cũ trên máy lên: phải chứng minh là chủ của dữ liệu đó (PIN chủ quán trong dữ liệu cũ),
+  // để người khác cầm máy này tạo tài khoản mới cũng không chép được menu, hoá đơn, nhân viên của quán
+  if (!blank) {
+    let legacyUsers = []
+    try { legacyUsers = JSON.parse(localStorage.getItem(LEGACY_PREFIX + 'users')) || [] } catch { /* bỏ qua */ }
+    const h = hashPin(String(f.legacyPin || ''))
+    const owner = legacyUsers.find((u) => u.roleId === 'owner' && u.active !== false && u.pinHash === h)
+    if (!/^\d{6}$/.test(f.legacyPin || '') || !owner) {
+      f.legacyPin = ''
+      return ui.toast('Mã PIN chủ quán của dữ liệu này không đúng', 'error')
+    }
+  }
   if (blank) {
     if (!f.ownerName.trim()) return ui.toast('Nhập tên của bạn (hiện ở màn hình chọn người)', 'error')
     if (!/^\d{6}$/.test(f.pin)) return ui.toast('Mã PIN gồm đúng 6 chữ số', 'error')
@@ -224,9 +264,11 @@ const view = computed(() => {
 const heading = computed(() => ({
   server: ['Cài máy chủ', 'Nhập địa chỉ và khoá công khai của dự án Supabase.'],
   loading: ['Dreamers POS', ''],
-  auth: mode.value === 'signin'
-    ? ['Đăng nhập', 'Dùng tài khoản chủ quán để mở quán trên máy này.']
-    : ['Tạo tài khoản', 'Mỗi quán có dữ liệu riêng: menu, phòng, hoá đơn, nhân viên.'],
+  auth: pendingInvite.value
+    ? [mode.value === 'signin' ? 'Đăng nhập' : 'Tạo tài khoản', 'Dùng đúng email đã được mời để vào quán.']
+    : mode.value === 'signin'
+      ? ['Đăng nhập', 'Dùng tài khoản chủ quán để mở quán trên máy này.']
+      : ['Tạo tài khoản', 'Mỗi quán có dữ liệu riêng: menu, phòng, hoá đơn, nhân viên.'],
   shops: ['Chọn quán', 'Chọn quán để mở trên máy này.'],
   create: ['Tạo quán mới', 'Vài thông tin cơ bản, có thể sửa lại trong Cài đặt.'],
 })[view.value])
@@ -253,6 +295,9 @@ function switchMode() {
         <Icon name="fa-wifi-slash" :size="16" />
         <span>Không tải được dữ liệu quán {{ activeShop?.name }}: {{ boot.error }}. Lần đầu mở quán trên máy này cần có mạng.</span>
         <button class="acct__link" @click="reopen">Thử lại</button>
+      </div>
+      <div v-if="pendingInvite && !session" class="acct__note">
+        <Icon name="fa-envelope-open-text" :size="16" /><span>Bạn được mời vào một quán. <b>Đăng nhập</b> hoặc <b>đăng ký</b> bằng đúng email đã được mời để vào quán.</span>
       </div>
       <div v-if="view === 'auth' && boot.state === 'needSession'" class="acct__note">
         <Icon name="fa-store" :size="16" /><span>Đăng nhập tài khoản chủ quán để mở <b>{{ activeShop?.name }}</b> trên máy này.</span>
@@ -294,7 +339,7 @@ function switchMode() {
           </button>
           <p class="acct-switch">
             {{ mode === 'signin' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?' }}
-            <button type="button" class="acct__link" @click="switchMode">{{ mode === 'signin' ? 'Đăng ký quán mới' : 'Đăng nhập' }}</button>
+            <button type="button" class="acct__link" @click="switchMode">{{ mode === 'signin' ? (pendingInvite ? 'Đăng ký tài khoản' : 'Đăng ký quán mới') : 'Đăng nhập' }}</button>
           </p>
         </form>
 
@@ -357,7 +402,13 @@ function switchMode() {
             </div>
             <p class="acct__foot-note">Mã PIN dùng để vào ca trên máy bán hàng. Nhân viên thêm sau trong Cài đặt › Người dùng.</p>
           </template>
-          <p v-else class="acct__foot-note">Nhân viên và mã PIN giữ nguyên như đang dùng.</p>
+          <template v-else>
+            <p class="ios-caption">Xác nhận chủ dữ liệu</p>
+            <div class="ios-group">
+              <label class="ios-field"><span>Mã PIN chủ quán ({{ legacySummary.name }})</span><input v-model="form.legacyPin" name="legacyPin" class="num" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="PIN 6 số của chủ quán" /></label>
+            </div>
+            <p class="acct__foot-note">Chỉ chủ quán của dữ liệu này mới đưa được lên. Nhân viên và mã PIN giữ nguyên như đang dùng.</p>
+          </template>
 
           <button class="btn btn--primary acct__cta" :disabled="busy"><span v-if="busy" class="spin spin--light"></span>Tạo quán & mở</button>
         </form>

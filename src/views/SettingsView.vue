@@ -19,7 +19,7 @@ import { useAuth, PERMISSION_GROUPS, initials } from '../stores/auth'
 import { useAudit } from '../stores/audit'
 import { useAppearance, THEMES, LAYOUTS, MOTIONS } from '../stores/theme'
 import { clearAll, exportAll, importAll, markSeeded } from '../utils/storage'
-import { nsKey, isLegacy, activeShop, activeShopId, setActiveShop } from '../tenant'
+import { nsKey, isLegacy, activeShop, activeShopId, setActiveShop, platformConfigured } from '../tenant'
 import { download, dateKey, fmtDate } from '../utils/format'
 
 const settings = useSettings()
@@ -64,18 +64,67 @@ function saveShop() {
 }
 
 // ---------------- Người dùng ----------------
+// Hệ thống nhiều quán: người dùng có thể thêm email (không bắt buộc) để tự đăng nhập app trên điện thoại riêng.
+// Không có email = chỉ vào ca bằng PIN trên máy của quán như trước.
+const emailMode = !isLegacy && platformConfigured()
+const canShare = typeof navigator !== 'undefined' && !!navigator.share
+const members = ref({}) // email -> { status: 'member'|'invited', token, role }
+const invite = ref(null) // { name, email, link } -> hộp gửi link mời
+async function loadMembers() {
+  if (!emailMode || !auth.can('settings.manage')) return
+  try {
+    const { listMembers } = await import('../sync/connection')
+    members.value = Object.fromEntries((await listMembers()).map((m) => [m.email, m]))
+  } catch { /* mất mạng / không có quyền: không hiện trạng thái */ }
+}
+watch(() => tab.value, (t) => t === 'users' && loadMembers(), { immediate: true })
+const memberOf = (u) => (u.email ? members.value[u.email.toLowerCase()] : null)
+async function showInvite(u) {
+  const m = memberOf(u)
+  const { inviteLink } = await import('../sync/connection')
+  if (m?.token) invite.value = { name: u.name, email: u.email, link: inviteLink(m.token) }
+}
+async function syncInvite(u, oldEmail) {
+  if (!emailMode) return
+  const conn = await import('../sync/connection')
+  try {
+    if (oldEmail && oldEmail !== u.email) await conn.removeMember(oldEmail)
+    if (u.email && u.active !== false) {
+      const r = await conn.inviteMember(u.email, u.roleId, u.id)
+      if (r.status === 'invited') invite.value = { name: u.name, email: u.email, link: r.link }
+      else ui.toast(`Đã cập nhật quyền của ${u.email}`)
+    } else if (u.email && u.active === false) await conn.removeMember(u.email)
+  } catch (e) {
+    ui.toast('Chưa gửi được lời mời: ' + e.message, 'error')
+  }
+  loadMembers()
+}
+async function copyInvite() {
+  try { await navigator.clipboard.writeText(invite.value.link); ui.toast('Đã sao chép link mời') }
+  catch { ui.toast('Không sao chép được — chọn và copy thủ công', 'error') }
+}
+async function shareInvite() {
+  try { await navigator.share({ title: 'Lời mời vào quán', text: `Mời ${invite.value.name} vào quán ${settings.shop.name}. Đăng ký / đăng nhập bằng ${invite.value.email}:`, url: invite.value.link }) } catch { /* huỷ chia sẻ */ }
+}
+
 const userForm = ref(null)
 function openUser(u) {
-  userForm.value = reactive(u ? { id: u.id, name: u.name, roleId: u.roleId, phone: u.phone || '', pin: '' } : { name: '', roleId: 'staff', phone: '', pin: '' })
+  userForm.value = reactive(u ? { id: u.id, name: u.name, roleId: u.roleId, phone: u.phone || '', email: u.email || '', pin: '' } : { name: '', roleId: 'staff', phone: '', email: '', pin: '' })
 }
 function saveUser() {
   const f = userForm.value
   if (!f.name.trim()) return ui.toast('Nhập tên người dùng', 'error')
   if (f.pin && !/^\d{6}$/.test(f.pin)) return ui.toast('PIN gồm đúng 6 chữ số', 'error')
+  const email = (f.email || '').trim().toLowerCase()
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return ui.toast('Email không hợp lệ', 'error')
+  if (email && auth.users.some((x) => x.id !== f.id && (x.email || '').toLowerCase() === email)) return ui.toast('Email này đã gắn với người dùng khác', 'error')
+  const oldEmail = f.id ? (auth.userById(f.id)?.email || '') : ''
+  const oldRole = f.id ? auth.userById(f.id)?.roleId : null
   try {
-    auth.saveUser({ ...f, name: f.name.trim(), pin: f.pin || undefined })
+    const u = auth.saveUser({ ...f, name: f.name.trim(), email, pin: f.pin || undefined })
     ui.toast(f.id ? 'Đã cập nhật người dùng' : `Đã thêm ${f.name}`)
     userForm.value = null
+    if (emailMode && (email !== oldEmail || (email && u.roleId !== oldRole))) syncInvite(u, oldEmail)
   } catch (e) {
     ui.toast(e.message, 'error')
   }
@@ -83,8 +132,12 @@ function saveUser() {
 async function toggleUser(u) {
   if (u.id === auth.user?.id) return ui.toast('Không thể khoá chính tài khoản đang dùng', 'error')
   const on = u.active === false
-  if (!on && !(await ui.confirm(`Khoá tài khoản ${u.name}? Người này sẽ không đăng nhập được nữa.`, { danger: true, okText: 'Khoá tài khoản' }))) return
-  try { auth.setActive(u.id, on); ui.toast(on ? 'Đã mở khoá tài khoản' : 'Đã khoá tài khoản') } catch (e) { ui.toast(e.message, 'error') }
+  if (!on && !(await ui.confirm(`Khoá tài khoản ${u.name}? Người này sẽ không đăng nhập được nữa${u.email ? ' (kể cả trên điện thoại riêng bằng email)' : ''}.`, { danger: true, okText: 'Khoá tài khoản' }))) return
+  try {
+    auth.setActive(u.id, on)
+    ui.toast(on ? 'Đã mở khoá tài khoản' : 'Đã khoá tài khoản')
+    if (u.email) syncInvite(u)
+  } catch (e) { ui.toast(e.message, 'error') }
 }
 const roleOptions = computed(() => auth.roles.map((r) => ({ value: r.id, label: r.name })))
 
@@ -296,7 +349,18 @@ async function wipe(withDemo) {
                   <td class="c-title">
                     <div class="flex">
                       <span class="avatar" :style="{ background: auth.roleById(u.roleId)?.color }">{{ initials(u.name) }}</span>
-                      <div><b>{{ u.name }}</b><span v-if="u.id === auth.user?.id" class="muted"> (bạn)</span></div>
+                      <div>
+                        <b>{{ u.name }}</b><span v-if="u.id === auth.user?.id" class="muted"> (bạn)</span>
+                        <div v-if="emailMode" class="u-email">
+                          <template v-if="u.email">
+                            <Icon name="fa-envelope" :size="11" /> {{ u.email }}
+                            <span v-if="memberOf(u)?.status === 'member'" class="badge badge--success">Đã tham gia</span>
+                            <button v-else-if="memberOf(u)?.status === 'invited'" class="badge badge--warning u-email__link" @click="showInvite(u)">Chờ nhận lời mời · Link mời</button>
+                          </template>
+                          <span v-else-if="u.roleId === 'owner'" class="muted">Chủ quán · dùng tài khoản email của quán</span>
+                          <span v-else class="muted">Chỉ vào ca bằng PIN trên máy quán</span>
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td class="c-sub"><span class="badge badge--plain" :style="{ color: auth.roleById(u.roleId)?.color }">{{ auth.roleById(u.roleId)?.name }}</span></td>
@@ -406,12 +470,29 @@ async function wipe(withDemo) {
       </div>
     </div>
 
+    <!-- Gửi link mời -->
+    <BaseModal v-if="invite" :title="`Gửi lời mời cho ${invite.name}`" width="480px" @close="invite = null">
+      <p style="margin-top: 0">Gửi link này cho <b>{{ invite.name }}</b> qua Zalo hoặc tin nhắn. Mở link, <b>đăng ký hoặc đăng nhập bằng {{ invite.email }}</b> là vào được quán với đúng quyền đã đặt.</p>
+      <div class="invite-link"><input class="input" :value="invite.link" readonly @focus="$event.target.select()" /></div>
+      <p class="muted" style="font-size: 13px">Link chỉ dùng được 1 lần và chỉ với email trên. Người khác có link nhưng sai email cũng không vào được. Muốn huỷ: khoá người dùng hoặc xoá email.</p>
+      <template #footer>
+        <button class="btn btn--ghost" @click="invite = null">Đóng</button>
+        <button v-if="canShare" class="btn btn--ghost" @click="shareInvite"><Icon name="fa-share-nodes" :size="15" />Chia sẻ</button>
+        <button class="btn btn--primary" @click="copyInvite"><Icon name="fa-copy" :size="15" />Sao chép link</button>
+      </template>
+    </BaseModal>
+
     <!-- Form người dùng -->
     <BaseModal v-if="userForm" :title="userForm.id ? `Sửa ${userForm.name}` : 'Thêm người dùng'" width="460px" @close="userForm = null">
       <form id="uform" class="form-grid" @submit.prevent="saveUser">
         <div class="field full"><label>Tên hiển thị *</label><input class="input" v-model="userForm.name" autofocus /></div>
         <div class="field"><label>Vai trò</label><AppSelect v-model="userForm.roleId" :options="roleOptions" /></div>
         <div class="field"><label>Điện thoại</label><input class="input" v-model="userForm.phone" /></div>
+        <div v-if="emailMode" class="field full">
+          <label>Email đăng nhập <span class="muted">· không bắt buộc</span></label>
+          <input class="input" v-model="userForm.email" type="email" inputmode="email" autocapitalize="off" placeholder="Để người này tự dùng app trên điện thoại của họ" />
+          <small class="muted">Có email: app tạo link mời để gửi qua Zalo / tin nhắn. Để trống: chỉ vào ca bằng PIN trên máy của quán.</small>
+        </div>
         <div class="field full">
           <label>{{ userForm.id ? 'Đổi mã PIN (để trống nếu giữ nguyên)' : 'Mã PIN 6 số *' }}</label>
           <input class="input num pin-input" v-model="userForm.pin" inputmode="numeric" maxlength="6" placeholder="••••••" />
@@ -522,4 +603,8 @@ tr.is-off { opacity: .55; }
   .settings__tabs { position: static; flex-direction: row; overflow-x: auto; button { flex-shrink: 0; } }
   .roles { grid-template-columns: 1fr; }
 }
+.u-email { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 2px; font-size: 12px; color: var(--text-2);
+  .badge { font-size: 11px; } }
+.u-email__link { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+.invite-link .input { font-size: 13px; }
 </style>

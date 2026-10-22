@@ -59,6 +59,7 @@ const viError = (e) => {
   if (/valid email|invalid format|Unable to validate email/i.test(m)) return 'Email không hợp lệ'
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Không kết nối được máy chủ — kiểm tra mạng'
   if (/signups not allowed|Signups not allowed/i.test(m)) return 'Hệ thống đang tạm ngừng nhận đăng ký mới'
+  if (/row-level security/i.test(m)) return 'Tài khoản này không có quyền làm việc này'
   return m
 }
 
@@ -135,3 +136,38 @@ export async function autoStart() {
 }
 
 export async function disconnect() { await signOut() }
+
+// ---------------- Thành viên quán đăng nhập bằng email (mời qua link) ----------------
+/** Vai trò trên máy chủ của tài khoản đang đăng nhập ở quán đang mở: 'owner' | 'manager' | 'staff' | null */
+export async function myRole(shopId = activeShopId) {
+  const s = await getSession()
+  if (!s || !shopId) return null
+  const { data } = await need().from('shop_members').select('role').eq('shop_id', shopId).eq('user_id', s.user.id).maybeSingle()
+  return data?.role || null
+}
+/** Vai trò trong app (chủ quán, quản lý, thu ngân…) -> quyền trên máy chủ: quản lý hoặc nhân viên */
+export const serverRole = (appRoleId) => (appRoleId === 'owner' || appRoleId === 'manager' ? 'manager' : 'staff')
+export const inviteLink = (token) => `${location.origin}${location.pathname}#/account?invite=${token}`
+
+/** Mời email vào quán. Trả về { status: 'member' } (đã là thành viên, cập nhật vai trò) hoặc { status: 'invited', link } */
+export async function inviteMember(email, appRoleId, posUserId) {
+  const { data, error } = await need().rpc('invite_member', { p_shop: activeShopId, p_email: String(email).trim().toLowerCase(), p_role: serverRole(appRoleId), p_pos_user: posUserId || null })
+  if (error) throw new Error(viError(error))
+  return data === 'member' ? { status: 'member' } : { status: 'invited', link: inviteLink(data) }
+}
+/** [{ email, role, pos_user_id, status: 'member'|'invited', token }] */
+export async function listMembers() {
+  const { data, error } = await need().rpc('list_members', { p_shop: activeShopId })
+  if (error) throw new Error(viError(error))
+  return data || []
+}
+export async function removeMember(email) {
+  const { error } = await need().rpc('remove_member', { p_shop: activeShopId, p_email: String(email).trim().toLowerCase() })
+  if (error) throw new Error(viError(error))
+}
+/** Nhận lời mời bằng mã trong link -> trả về mã quán */
+export async function acceptInvite(token) {
+  const { data, error } = await need().rpc('accept_invite', { p_token: String(token).trim() })
+  if (error) throw new Error(viError(error))
+  return data
+}

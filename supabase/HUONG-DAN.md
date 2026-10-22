@@ -64,6 +64,24 @@ Gửi họ link app. Họ:
 
 Mở thêm chi nhánh: vào **Cài đặt** → **Tài khoản & đồng bộ** → **Tài khoản & đổi quán** → **Tạo quán mới**.
 
+## 6b. Nhân viên: dùng PIN hoặc mời bằng email
+
+Vào **Cài đặt** → **Người dùng** → **Thêm người dùng**. Có 2 cách, chọn cách nào cũng được:
+
+- **Chỉ dùng PIN** (để trống ô Email): nhân viên vào ca và chốt ca bằng mã PIN trên máy của quán, như trước giờ.
+- **Mời bằng email** (điền Email): app hiện **link mời** → bấm **Sao chép link** hoặc **Chia sẻ** để gửi qua Zalo / tin nhắn.
+  - Nhân viên mở link → **đăng ký hoặc đăng nhập bằng đúng email đó** → vào thẳng quán trên điện thoại của họ, rồi vào ca bằng PIN của mình.
+  - Link chỉ dùng được với đúng email đó. Người khác có link nhưng khác email thì không vào được.
+  - Danh sách người dùng hiện trạng thái **Chờ nhận lời mời** (bấm vào để lấy lại link) hoặc **Đã tham gia**.
+  - **Khoá** người dùng hoặc xoá email: người đó mất quyền vào quán ngay trên mọi máy.
+
+Quyền trên máy chủ theo vai trò:
+
+- **Quản lý:** bán hàng, sửa menu, thêm nhân viên, mời nhân viên. **Không** đổi được tài khoản ngân hàng nhận tiền.
+- **Nhân viên, thu ngân, lễ tân, buồng phòng:** bán hàng, nhận / trả phòng, ca làm việc. **Không** sửa được người dùng, mã PIN, phân quyền, thông tin quán hay tài khoản ngân hàng, kể cả khi cố tình gọi thẳng máy chủ.
+
+⚠️ **Mỗi khi file `supabase/schema.sql` được cập nhật, chạy lại toàn bộ file trong SQL Editor.** Chạy lại nhiều lần vẫn an toàn, không mất dữ liệu.
+
 Biểu tượng đám mây trên thanh trên cùng cho biết trạng thái đồng bộ:
 
 - **Xanh lá:** đang đồng bộ.

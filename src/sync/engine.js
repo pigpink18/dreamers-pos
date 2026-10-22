@@ -166,7 +166,17 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = P
         while ((rows = Object.values(outbox)).length) {
           const chunk = rows.slice(0, 500).map(({ collection, id, data, deleted, ord }) => ({ shop_id: shopId, collection, id, data, deleted, ord: ord ?? 0, device }))
           const { error } = await client.from(TABLE).upsert(chunk, { onConflict: 'shop_id,collection,id' })
-          if (error) throw error
+          if (error) {
+            if (!isDenied(error)) throw error
+            // Máy chủ từ chối (tài khoản không đủ quyền, VD nhân viên sửa người dùng / tài khoản ngân hàng):
+            // tìm đúng dòng bị từ chối, bỏ khỏi hàng đợi và lấy lại bản trên máy chủ — không làm kẹt các thay đổi khác
+            const denied = []
+            for (const r of chunk) {
+              const { error: e1 } = await client.from(TABLE).upsert([r], { onConflict: 'shop_id,collection,id' })
+              if (e1) { if (isDenied(e1)) denied.push(r); else throw e1 }
+            }
+            await rejectRows(denied)
+          }
           let removed = 0
           chunk.forEach((r) => {
             const k = r.collection + '|' + r.id
@@ -182,6 +192,21 @@ export function createSyncEngine({ storage = globalThis.localStorage, prefix = P
       }
     })().finally(() => (flushP = null))
     return flushP
+  }
+
+  const isDenied = (e) => e?.code === '42501' || /row-level security|permission denied/i.test(e?.message || '')
+  /** Bỏ các thay đổi bị máy chủ từ chối, khôi phục đúng bản đang có trên máy chủ */
+  async function rejectRows(rows) {
+    if (!rows.length) return
+    rows.forEach((r) => delete outbox[r.collection + '|' + r.id])
+    saveOutbox()
+    for (const r of rows) {
+      const { data } = await client.from(TABLE).select('collection,id,data,deleted,ord,updated_at')
+        .eq('shop_id', shopId).eq('collection', r.collection).eq('id', r.id).maybeSingle()
+      apply(data || { collection: r.collection, id: r.id, data: null, deleted: true })
+    }
+    status.denied = (status.denied || 0) + rows.length
+    status.deniedMsg = 'Một số thay đổi cần quyền chủ quán / quản lý nên đã được huỷ trên máy này'
   }
 
   async function fetchSince(since) {
