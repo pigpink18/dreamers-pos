@@ -32,6 +32,7 @@ const router = useRouter()
 
 const TABS = [
   { key: 'appearance', label: 'Giao diện', icon: 'fa-palette' },
+  { key: 'printer', label: 'Máy in', icon: 'print' }, // ai cũng cài được máy in cho máy mình
   { key: 'shop', label: 'Cửa hàng', icon: 'fa-store', perm: 'settings.manage' },
   { key: 'users', label: 'Người dùng', icon: 'users', perm: 'users.manage' },
   { key: 'roles', label: 'Phân quyền', icon: 'fa-user-shield', perm: 'roles.manage' },
@@ -332,8 +333,10 @@ async function wipe(withDemo) {
             <div class="full"><button class="btn btn--primary"><Icon name="check" :size="15" />Lưu thay đổi</button></div>
           </form>
         </section>
-        <PrinterSettings />
         </template>
+
+        <!-- ============ MÁY IN ============ -->
+        <PrinterSettings v-else-if="tab === 'printer'" />
 
         <!-- ============ NGƯỜI DÙNG ============ -->
         <section v-else-if="tab === 'users'" class="card">
