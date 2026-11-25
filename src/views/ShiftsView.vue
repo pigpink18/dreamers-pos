@@ -45,7 +45,7 @@ const duration = (s) => {
     <div class="page-header">
       <div><h1>Ca làm việc</h1><p>Mở ca, chốt két và đối soát tiền mặt cuối ca</p></div>
       <div class="spacer"></div>
-      <button class="btn btn--ghost" @click="dayPrint = dateKey()"><Icon name="print" :size="15" />Tổng kết hôm nay</button>
+      <button v-if="auth.can('shifts.viewAll')" class="btn btn--ghost" @click="dayPrint = dateKey()"><Icon name="print" :size="15" />Tổng kết hôm nay</button>
       <button v-if="!cur" class="btn btn--primary" @click="showOpen = true"><Icon name="fa-lock-open" :size="15" />Mở ca</button>
       <button v-else class="btn btn--primary" @click="showClose = true"><Icon name="fa-lock" :size="15" />Đóng ca {{ cur.code }}</button>
     </div>

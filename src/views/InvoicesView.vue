@@ -5,9 +5,13 @@ import AppDate from '../components/ui/AppDate.vue'
 import AppSelect from '../components/ui/AppSelect.vue'
 import InvoiceDetailModal from '../components/invoices/InvoiceDetailModal.vue'
 import { useInvoices, PAY_METHODS, INVOICE_TYPES } from '../stores/invoices'
+import { useAuth } from '../stores/auth'
 import { money, fmtDateTime, dateKey, addDays, normalize, toCsv, download } from '../utils/format'
 
 const invoices = useInvoices()
+const auth = useAuth()
+// Nhân viên chỉ thấy hoá đơn bộ phận mình (cà phê / tiền phòng); chủ quán, quản lý thấy tất cả
+const typeOptions = computed(() => Object.entries(INVOICE_TYPES).filter(([value]) => auth.canSeeInvoice({ type: value })).map(([value, label]) => ({ value, label })))
 const today = dateKey()
 
 // ---------- Bộ lọc ----------
@@ -35,6 +39,7 @@ const filtered = computed(() => {
   return invoices.items.filter((i) => {
     const d = dateKey(i.createdAt)
     return (
+      auth.canSeeInvoice(i) &&
       d >= from.value && d <= to.value &&
       (!type.value || i.type === type.value) &&
       (!status.value || i.status === status.value) &&
@@ -94,7 +99,7 @@ function exportCsv() {
           <AppDate v-model="to" :min="from" @update:model-value="preset = ''" />
         </div>
         <div class="search" style="flex: 1; min-width: 200px"><input class="input" v-model="q" placeholder="Mã hoá đơn, tên khách..." /></div>
-        <AppSelect v-model="type" :options="[{ value: '', label: 'Mọi loại' }, ...Object.entries(INVOICE_TYPES).map(([value, label]) => ({ value, label }))]" style="width: 150px" />
+        <AppSelect v-model="type" v-if="typeOptions.length > 1" :options="[{ value: '', label: 'Mọi loại' }, ...typeOptions]" style="width: 150px" />
         <AppSelect v-model="method" :options="[{ value: '', label: 'Mọi hình thức' }, ...Object.entries(PAY_METHODS).map(([value, label]) => ({ value, label }))]" style="width: 160px" />
         <AppSelect v-model="status" :options="[{ value: '', label: 'Mọi trạng thái' }, { value: 'completed', label: 'Hoàn thành' }, { value: 'cancelled', label: 'Đã huỷ' }]" style="width: 160px" />
       </div>

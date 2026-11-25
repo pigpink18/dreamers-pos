@@ -10,6 +10,7 @@ import InvoiceDetailModal from '../invoices/InvoiceDetailModal.vue'
 import { useProducts } from '../../stores/products'
 import { useCustomers } from '../../stores/customers'
 import { useInvoices } from '../../stores/invoices'
+import { useAuth } from '../../stores/auth'
 import { useRooms, ROOM_STATUS } from '../../stores/rooms'
 import { useTheme } from '../../stores/theme'
 import { normalize, money } from '../../utils/format'
@@ -19,6 +20,7 @@ const router = useRouter()
 const products = useProducts()
 const customers = useCustomers()
 const invoices = useInvoices()
+const auth = useAuth()
 const rooms = useRooms()
 const theme = useTheme()
 
@@ -76,7 +78,7 @@ const groups = computed(() => {
   if (ps.length) out.push({ label: 'Hàng hoá', items: ps.map((p) => ({ id: p.id, icon: 'box', title: p.name, sub: `${money(p.price)} · ${p.trackStock === false ? 'Dịch vụ' : 'Tồn ' + p.stock}`, run: go('/products') })) })
 
   if (k.length >= 3) {
-    const is = invoices.items.filter((i) => match(i.code)).slice(0, 5)
+    const is = invoices.items.filter((i) => auth.canSeeInvoice(i) && match(i.code)).slice(0, 5)
     if (is.length) out.push({ label: 'Hoá đơn', items: is.map((i) => ({ id: i.id, icon: 'receipt', title: i.code, sub: `${i.customerName} · ${money(i.total)}`, run: () => (invoiceId.value = i.id) })) })
   }
   return out

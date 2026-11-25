@@ -6,12 +6,15 @@ import Icon from '../ui/Icon.vue'
 import ShiftPrintModal from './ShiftPrintModal.vue'
 import { useShifts, DENOMINATIONS } from '../../stores/shifts'
 import { useUi } from '../../stores/ui'
+import { useAuth } from '../../stores/auth'
 import { money, number, fmtDateTime, dateKey } from '../../utils/format'
 import MoneyInput from '../ui/MoneyInput.vue'
 
 const emit = defineEmits(['close', 'closed'])
 const shifts = useShifts()
 const ui = useUi()
+// Tổng kết ngày gồm doanh thu của mọi bộ phận -> chỉ người xem được mọi ca (chủ quán, quản lý)
+const canDay = useAuth().can('shifts.viewAll')
 const s = shifts.current
 const sum = computed(() => shifts.summary(s))
 
@@ -28,7 +31,7 @@ const done = ref(null) // ca vừa đóng -> chuyển sang màn hình in
 // - Hôm nay đã có người KHÁC làm ca trước  -> chia ca: in PHIẾU CHỐT CA của ca này
 // - Chỉ mình người này làm hôm nay: đóng trước 15h -> giao ca (phiếu chốt ca); từ 15h -> đóng cửa cuối ngày (TỔNG KẾT NGÀY)
 const otherToday = shifts.items.some((x) => x.id !== s.id && dateKey(x.openedAt) === dateKey(s.openedAt) && x.userId !== s.userId)
-const printKind = ref(otherToday ? 'shift' : new Date().getHours() >= 15 ? 'day' : 'shift')
+const printKind = ref(otherToday || !canDay ? 'shift' : new Date().getHours() >= 15 ? 'day' : 'shift')
 
 async function submit() {
   if (diff.value !== 0 && !note.value.trim())
@@ -48,7 +51,7 @@ async function submit() {
       <div>
         <b>Đã đóng ca {{ done.code }}</b>
         <span v-if="printKind === 'day'">Ca cuối ngày — in <b>Tổng kết ngày</b> để chốt sổ cả ngày (có thể chuyển sang Phiếu chốt ca).</span>
-        <span v-else>Giao ca — in <b>Phiếu chốt ca</b> tổng tiền của riêng ca này (có thể chuyển sang Tổng kết ngày).</span>
+        <span v-else>Giao ca — in <b>Phiếu chốt ca</b> tổng tiền của riêng ca này<template v-if="canDay"> (có thể chuyển sang Tổng kết ngày)</template>.</span>
       </div>
     </div>
   </ShiftPrintModal>
@@ -99,7 +102,7 @@ async function submit() {
           <label>Ghi chú {{ diff !== 0 ? '(bắt buộc khi lệch két)' : '' }}</label>
           <input class="input" v-model="note" placeholder="VD: thối nhầm tiền lẻ" />
         </div>
-        <div class="field mt-16">
+        <div v-if="canDay" class="field mt-16">
           <label>Đóng ca xong sẽ in</label>
           <div class="print-kind" role="radiogroup">
             <button type="button" role="radio" :aria-checked="printKind === 'shift'" :class="{ active: printKind === 'shift' }" @click="printKind = 'shift'">

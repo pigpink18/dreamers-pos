@@ -8,6 +8,7 @@ import EinvoiceModal from './EinvoiceModal.vue'
 import { useSettings } from '../../stores/settings'
 import { EINV_STATUS, PROVIDERS } from '../../einvoice'
 import { useInvoices } from '../../stores/invoices'
+import { useAuth } from '../../stores/auth'
 import { useShifts } from '../../stores/shifts'
 import { useUi } from '../../stores/ui'
 import { fmtDateTime } from '../../utils/format'
@@ -17,7 +18,12 @@ const emit = defineEmits(['close'])
 const invoices = useInvoices()
 const shifts = useShifts()
 const ui = useUi()
-const inv = computed(() => invoices.byId(props.invoiceId))
+const auth = useAuth()
+// Chỉ mở hoá đơn thuộc bộ phận mình được xem, hoặc hoá đơn chính mình vừa lập (để in cho khách)
+const inv = computed(() => {
+  const i = invoices.byId(props.invoiceId)
+  return i && (auth.canSeeInvoice(i) || (i.createdById && i.createdById === auth.user?.id)) ? i : null
+})
 const shiftCode = computed(() => shifts.byId(inv.value?.shiftId)?.code)
 
 const settings = useSettings()

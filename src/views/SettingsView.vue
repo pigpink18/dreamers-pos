@@ -15,7 +15,7 @@ import ChannelSettings from '../components/settings/ChannelSettings.vue'
 import PrinterSettings from '../components/settings/PrinterSettings.vue'
 import { useSettings } from '../stores/settings'
 import { useUi } from '../stores/ui'
-import { useAuth, PERMISSION_GROUPS, initials } from '../stores/auth'
+import { useAuth, PERMISSION_GROUPS, SENSITIVE_PERMISSIONS, initials } from '../stores/auth'
 import { useAudit } from '../stores/audit'
 import { useAppearance, THEMES, LAYOUTS, MOTIONS } from '../stores/theme'
 import { clearAll, exportAll, importAll, markSeeded } from '../utils/storage'
@@ -166,6 +166,8 @@ async function removeRole() {
   if (!(await ui.confirm(`Xoá vai trò ${editRole.value.name}?`, { danger: true, okText: 'Xoá' }))) return
   try { auth.removeRole(editRole.value.id); roleId.value = 'staff' } catch (e) { ui.toast(e.message, 'error') }
 }
+// Số quyền quan trọng vai trò đang có (hiện cảnh báo cho chủ quán)
+const sensitiveOn = computed(() => (editRole.value && editRole.value.id !== 'owner' ? editRole.value.permissions.filter((p) => SENSITIVE_PERMISSIONS.has(p)) : []))
 const usersInRole = (id) => auth.users.filter((u) => u.roleId === id && u.active !== false).length
 
 // ---------------- Vận hành ----------------
@@ -397,12 +399,17 @@ async function wipe(withDemo) {
 
           <div class="card roles__perm" v-if="editRole">
             <div class="card__header">
-              <h3>Quyền của {{ editRole.name }}</h3>
+              <div>
+                <h3>Quyền của {{ editRole.name }}</h3>
+                <small v-if="editRole.desc" class="muted">{{ editRole.desc }}</small>
+              </div>
               <div class="spacer"></div>
               <button v-if="!editRole.system" class="btn btn--danger btn--sm" @click="removeRole">Xoá vai trò</button>
             </div>
             <div class="card__body">
               <div v-if="editRole.id === 'owner'" class="notice"><Icon name="fa-circle-info" :size="15" /> Chủ quán luôn có toàn quyền và không thể chỉnh.</div>
+              <div v-else-if="sensitiveOn.length" class="notice notice--warn"><Icon name="fa-triangle-exclamation" :size="15" /><span>Vai trò này đang có {{ sensitiveOn.length }} quyền quan trọng (đánh dấu <b>Quan trọng</b> bên dưới). Nhân viên thường không nên có các quyền này.</span></div>
+              <div v-else class="notice notice--ok"><Icon name="fa-shield-check" :size="15" /><span>Không có quyền quan trọng: không xem tổng doanh thu, không sửa giá, không tự huỷ hoá đơn.</span></div>
               <div class="discount-row">
                 <div><b>Giảm giá tối đa không cần duyệt</b><p class="muted">Vượt mức này, quản lý phải nhập PIN để duyệt</p></div>
                 <div class="flex"><input class="input num" type="number" min="0" max="100" :value="editRole.maxDiscount" :disabled="editRole.id === 'owner'" @change="setDiscount($event.target.value)" style="width: 80px; text-align: right" /> %</div>
@@ -410,7 +417,7 @@ async function wipe(withDemo) {
               <div v-for="g in PERMISSION_GROUPS" :key="g.group" class="perm-group">
                 <h4>{{ g.group }}</h4>
                 <label v-for="[k, label] in g.items" :key="k" class="switch-row" :class="{ disabled: editRole.id === 'owner' }">
-                  <span>{{ label }}</span>
+                  <span>{{ label }}<em v-if="SENSITIVE_PERMISSIONS.has(k)" class="perm-flag">Quan trọng</em></span>
                   <input type="checkbox" class="switch" :checked="editRole.permissions.includes(k)" :disabled="editRole.id === 'owner'" @change="togglePerm(k)" />
                 </label>
               </div>
@@ -559,6 +566,7 @@ async function wipe(withDemo) {
 }
 .roles__add { display: flex; gap: 6px; padding: 8px 12px 4px; .input { flex: 1; } }
 .discount-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 14px; background: $surface-2; margin-bottom: 8px; p { margin: 2px 0 0; font-size: 13px; } }
+.perm-flag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: $danger-soft; color: $danger; font-size: 11px; font-style: normal; font-weight: 600; vertical-align: 1px; }
 .perm-group { margin-top: 18px; h4 { font-size: 12px; color: $text-muted; font-weight: 600; margin: 0 0 4px; } }
 .switch-row {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid $border; cursor: pointer;
@@ -578,6 +586,8 @@ async function wipe(withDemo) {
   b { color: $text; } ul { margin: 6px 0; padding-left: 18px; color: $text-2; } li { margin: 2px 0; }
 }
 .notice { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: $info-soft; color: $info; margin-bottom: 12px; }
+.notice.notice--warn { background: $warning-soft; color: $warning; }
+.notice.notice--ok { background: $success-soft; color: $success; }
 tr.is-off { opacity: .55; }
 
 // Chọn mức hiệu ứng, có ô xem trước chuyển động

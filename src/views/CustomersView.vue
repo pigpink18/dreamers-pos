@@ -22,7 +22,7 @@ const auth = useAuth()
 const stats = computed(() => {
   const m = {}
   for (const i of invoices.completed) {
-    if (!i.customerId) continue
+    if (!i.customerId || !auth.canSeeInvoice(i)) continue // nhân viên chỉ thấy chi tiêu ở bộ phận mình
     const s = (m[i.customerId] ||= { count: 0, spent: 0, last: null, stays: 0 })
     s.count++
     s.spent += i.total
@@ -45,7 +45,7 @@ const list = computed(() => {
 const formFor = ref(undefined) // undefined = đóng, null = thêm mới, object = sửa
 const detail = ref(null)
 const openInvoice = ref(null)
-const detailInvoices = computed(() => (detail.value ? invoices.ofCustomer(detail.value.id) : []))
+const detailInvoices = computed(() => (detail.value ? invoices.ofCustomer(detail.value.id).filter((i) => auth.canSeeInvoice(i)) : []))
 const detailBookings = computed(() =>
   detail.value ? rooms.bookings.filter((b) => b.customerId === detail.value.id).sort((a, b) => b.checkIn.localeCompare(a.checkIn)) : []
 )

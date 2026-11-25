@@ -20,7 +20,9 @@ export const PERMISSION_GROUPS = [
     ['pos.discount', 'Giảm giá trên hoá đơn'],
   ] },
   { group: 'Hoá đơn', items: [
-    ['invoices.view', 'Xem hoá đơn'],
+    ['invoices.view', 'Xem TẤT CẢ hoá đơn (cà phê + tiền phòng)'],
+    ['invoices.viewRetail', 'Chỉ xem hoá đơn cà phê / bán hàng'],
+    ['invoices.viewRoom', 'Chỉ xem hoá đơn tiền phòng'],
     ['invoices.cancel', 'Huỷ hoá đơn'],
   ] },
   { group: 'Homestay', items: [
@@ -54,6 +56,13 @@ export const PERMISSION_GROUPS = [
 ]
 export const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap((g) => g.items.map(([k]) => k))
 export const PERMISSION_LABEL = Object.fromEntries(PERMISSION_GROUPS.flatMap((g) => g.items))
+/** Quyền quan trọng (xem doanh thu, sửa giá, huỷ hoá đơn, quản trị) — thường chỉ dành cho chủ quán / quản lý */
+export const SENSITIVE_PERMISSIONS = new Set([
+  'invoices.view', 'invoices.cancel', 'rooms.manage', 'products.manage', 'products.import',
+  'dashboard.view', 'reports.view', 'shifts.viewAll', 'audit.view', 'users.manage', 'roles.manage', 'settings.manage',
+])
+/** Vào được trang Hoá đơn nếu có 1 trong các quyền này */
+export const INVOICE_VIEW_PERMS = ['invoices.view', 'invoices.viewRetail', 'invoices.viewRoom']
 
 // ---------------- Vai trò mặc định ----------------
 const P = (...keys) => keys
@@ -69,7 +78,17 @@ export const DEFAULT_ROLES = [
     permissions: P('dashboard.view', 'pos.sell', 'pos.discount', 'invoices.view', 'rooms.view', 'rooms.book', 'rooms.checkin', 'rooms.clean', 'customers.view', 'customers.manage', 'shifts.open') },
   { id: 'housekeeping', name: 'Buồng phòng', color: '#6b5b95', maxDiscount: 0, system: true,
     permissions: P('rooms.view', 'rooms.clean') },
+  // Tách nhân viên quán cà phê và nhân viên homestay: mỗi bên chỉ thấy hoá đơn của bộ phận mình,
+  // không xem tổng quan/báo cáo doanh thu, không sửa giá, không tự huỷ hoá đơn; chỉ được giảm giá trong mức cho phép.
+  { id: 'barista', name: 'Barista', color: '#8a5a2b', maxDiscount: 10, system: true,
+    desc: 'Pha chế & bán hàng quán cà phê — chỉ thấy hoá đơn cà phê',
+    permissions: P('pos.sell', 'pos.discount', 'invoices.viewRetail', 'products.view', 'customers.view', 'customers.manage', 'shifts.open') },
+  { id: 'homestay', name: 'Nhân viên homestay', color: '#0f766e', maxDiscount: 10, system: true,
+    desc: 'Đặt phòng, nhận/trả phòng, dọn phòng — chỉ thấy hoá đơn tiền phòng',
+    permissions: P('pos.discount', 'invoices.viewRoom', 'rooms.view', 'rooms.book', 'rooms.checkin', 'rooms.clean', 'customers.view', 'customers.manage', 'shifts.open') },
 ]
+/** Vai trò mẫu thêm sau này: tự bổ sung vào quán đang dùng (không đụng vai trò đã có) */
+const ADDED_ROLES = ['barista', 'homestay']
 
 /** Băm PIN (không phải bảo mật cấp ngân hàng — chỉ để PIN không nằm trần trong localStorage) */
 export function hashPin(pin, salt = 'dreamers') {
@@ -88,6 +107,12 @@ export const useAuth = defineStore('auth', () => {
   /** { id, name, username, roleId, pinHash, active, createdAt, phone } */
   const users = useStorage('users', [])
   const roles = useStorage('roles', DEFAULT_ROLES.map((r) => ({ ...r, permissions: [...r.permissions] })))
+  for (const id of ADDED_ROLES) {
+    if (!roles.value.some((r) => r.id === id)) {
+      const r = DEFAULT_ROLES.find((x) => x.id === id)
+      roles.value.push({ ...r, permissions: [...r.permissions] })
+    }
+  }
   /** Phiên hiện tại: { userId, locked, since } */
   const session = useStorage('session', null)
 
@@ -101,7 +126,10 @@ export const useAuth = defineStore('auth', () => {
   const userById = (id) => users.value.find((u) => u.id === id)
   const userCan = (u, perm) => !!u && (roleById(u.roleId)?.permissions || []).includes(perm)
   /** Người đang đăng nhập có quyền này không? */
-  const can = (perm) => userCan(user.value, perm)
+  /** perm: 1 quyền, hoặc mảng = có ít nhất 1 trong các quyền */
+  const can = (perm) => (Array.isArray(perm) ? perm.some((p) => userCan(user.value, p)) : userCan(user.value, perm))
+  /** Hoá đơn này người đang đăng nhập có được xem không (tách cà phê / tiền phòng) */
+  const canSeeInvoice = (inv) => !!inv && (can('invoices.view') || can(inv.type === 'room' ? 'invoices.viewRoom' : 'invoices.viewRetail'))
   const maxDiscount = computed(() => role.value?.maxDiscount ?? 0)
 
   // ---------- Chống dò PIN: sai 5 lần -> khoá tạm 30 giây, càng sai càng khoá lâu (tối đa 15 phút) ----------
@@ -225,7 +253,7 @@ export const useAuth = defineStore('auth', () => {
 
   return {
     users, roles, session, user, role, isLocked, isAuthenticated, activeUsers, maxDiscount,
-    roleById, userById, userCan, can, login, lock, logout, findByPin, pinTaken, saveUser, setActive, pinWait,
+    roleById, userById, userCan, can, canSeeInvoice, login, lock, logout, findByPin, pinTaken, saveUser, setActive, pinWait,
     saveRole, removeRole, setupOwner,
   }
 })

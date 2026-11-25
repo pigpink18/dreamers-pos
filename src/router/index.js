@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { useAuth } from '../stores/auth'
+import { useAuth, INVOICE_VIEW_PERMS } from '../stores/auth'
 import { isLegacy, platformConfigured, activeShop } from '../tenant'
 import { boot } from '../boot'
 
@@ -13,7 +13,7 @@ const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { title: 'Đăng nhập', public: true, bare: true, hidden: true } },
   { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Tổng quan', icon: 'dashboard', perm: 'dashboard.view' } },
   { path: '/pos', name: 'pos', component: () => import('../views/PosView.vue'), meta: { title: 'Bán hàng', icon: 'pos', full: true, perm: 'pos.sell' } },
-  { path: '/invoices', name: 'invoices', component: () => import('../views/InvoicesView.vue'), meta: { title: 'Hoá đơn', icon: 'receipt', perm: 'invoices.view' } },
+  { path: '/invoices', name: 'invoices', component: () => import('../views/InvoicesView.vue'), meta: { title: 'Hoá đơn', icon: 'receipt', perm: INVOICE_VIEW_PERMS } },
   { path: '/rooms', name: 'rooms', component: () => import('../views/RoomsView.vue'), meta: { title: 'Sơ đồ phòng', tab: 'Phòng', icon: 'bed', group: 'Homestay', perm: 'rooms.view' } },
   { path: '/bookings', name: 'bookings', component: () => import('../views/BookingCalendarView.vue'), meta: { title: 'Lịch đặt phòng', icon: 'calendar', group: 'Homestay', perm: 'rooms.view' } },
   { path: '/products', name: 'products', component: () => import('../views/ProductsView.vue'), meta: { title: 'Hàng hoá & kho', icon: 'box', group: 'Quản lý', perm: 'products.view' } },
@@ -34,7 +34,9 @@ const router = createRouter({
 /** Trang đầu tiên người dùng hiện tại được phép vào (VD: Buồng phòng -> Sơ đồ phòng) */
 export function firstAllowedPath() {
   const auth = useAuth()
-  const r = routes.find((r) => !r.meta?.public && !r.redirect && (!r.meta?.perm || auth.can(r.meta.perm)))
+  const ok = (r) => r && !r.meta?.public && !r.redirect && (!r.meta?.perm || auth.can(r.meta.perm))
+  // Ưu tiên trang làm việc chính: Tổng quan -> Bán hàng -> Sơ đồ phòng (VD: nhân viên homestay vào thẳng Sơ đồ phòng)
+  const r = ['/', '/pos', '/rooms'].map((p) => routes.find((x) => x.path === p)).find(ok) || routes.find(ok)
   return r?.path || '/settings'
 }
 
