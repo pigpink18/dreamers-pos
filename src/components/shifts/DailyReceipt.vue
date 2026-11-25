@@ -4,6 +4,7 @@
  * - Doanh thu theo hình thức thanh toán, theo loại (bán hàng / tiền phòng)
  * - Danh sách món đã bán (gộp số lượng)
  * - Các ca trong ngày + két lệch
+ * - Nhân viên chỉ xem hoá đơn 1 bộ phận (Barista / homestay): phiếu chỉ tính tiền bộ phận đó
  */
 import { computed } from 'vue'
 import { useInvoices, PAY_METHODS } from '../../stores/invoices'
@@ -18,7 +19,10 @@ const shifts = useShifts()
 const settings = useSettings()
 const auth = useAuth()
 
-const dayInv = computed(() => invoices.items.filter((i) => dateKey(i.createdAt) === props.date))
+// Chủ quán / quản lý (xem mọi hoá đơn) thấy cả ngày; nhân viên chỉ thấy bộ phận mình
+const full = computed(() => auth.can('invoices.view') || (auth.can('invoices.viewRetail') && auth.can('invoices.viewRoom')))
+const scope = computed(() => (full.value ? '' : auth.can('invoices.viewRoom') ? 'TIỀN PHÒNG' : 'CÀ PHÊ / BÁN HÀNG'))
+const dayInv = computed(() => invoices.items.filter((i) => dateKey(i.createdAt) === props.date && auth.canSeeInvoice(i)))
 const done = computed(() => dayInv.value.filter((i) => i.status === 'completed'))
 const cancelled = computed(() => dayInv.value.filter((i) => i.status !== 'completed'))
 const sumBy = (list, f) => list.reduce((s, i) => s + f(i), 0)
@@ -51,6 +55,10 @@ const lines = computed(() => {
 })
 
 const dayShifts = computed(() => shifts.items.filter((s) => dateKey(s.openedAt) === props.date).slice().sort((a, b) => a.openedAt.localeCompare(b.openedAt)))
+// Doanh thu từng ca: chỉ cộng hoá đơn người xem được thấy
+const shiftRevenue = (s) => full.value
+  ? (s.status === 'closed' ? s.revenue : shifts.summary(s).revenue)
+  : sumBy(done.value.filter((i) => i.shiftId === s.id), (i) => i.total)
 const diffTotal = computed(() => sumBy(dayShifts.value.filter((s) => s.status === 'closed'), (s) => s.diff || 0))
 const printedAt = new Date()
 </script>
@@ -62,7 +70,7 @@ const printedAt = new Date()
       <div>{{ settings.shop.address }}</div>
       <div v-if="settings.shop.phone">ĐT: {{ settings.shop.phone }}</div>
     </div>
-    <div class="receipt__title">TỔNG KẾT NGÀY</div>
+    <div class="receipt__title">TỔNG KẾT NGÀY<template v-if="scope"><br />{{ scope }}</template></div>
     <div class="day-receipt__date">{{ weekday(date) }}, {{ fmtDate(date) }}</div>
 
     <div class="receipt__sum">
@@ -78,11 +86,13 @@ const printedAt = new Date()
       <div v-for="(label, k) in PAY_METHODS" :key="k"><span>{{ label }}</span><b>{{ money(t.byMethod[k]) }}</b></div>
     </div>
 
+    <template v-if="full">
     <div class="day-receipt__sec">Theo loại</div>
     <div class="receipt__sum">
       <div><span>Bán hàng (café, đồ ăn…)</span><b>{{ money(t.retail) }}</b></div>
       <div><span>Tiền phòng</span><b>{{ money(t.room) }}</b></div>
     </div>
+    </template>
 
     <table v-if="lines.length">
       <thead><tr><th>Món / dịch vụ</th><th class="r">SL</th><th class="r">Thành tiền</th></tr></thead>
@@ -99,12 +109,13 @@ const printedAt = new Date()
           <tr v-for="s in dayShifts" :key="s.id">
             <td>{{ s.code }}<div class="sub">{{ s.userName }}</div></td>
             <td>{{ fmtTime(s.openedAt) }}–{{ s.closedAt ? fmtTime(s.closedAt) : 'đang mở' }}</td>
-            <td class="r">{{ number(s.status === 'closed' ? s.revenue : shifts.summary(s).revenue) }}</td>
+            <td class="r">{{ number(shiftRevenue(s)) }}</td>
             <td class="r">{{ s.status === 'closed' ? (s.diff > 0 ? '+' : '') + number(s.diff || 0) : '—' }}</td>
           </tr>
         </tbody>
       </table>
       <div class="receipt__sum" style="border-top: 0; padding-top: 0">
+        <div v-if="!full" class="sub" style="display: block">Lệch két tính cho cả két chung của quán</div>
         <div><span>Tổng lệch két</span><b>{{ (diffTotal > 0 ? '+' : '') + money(diffTotal) }}</b></div>
       </div>
     </template>

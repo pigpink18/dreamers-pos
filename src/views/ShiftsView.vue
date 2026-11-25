@@ -8,7 +8,7 @@ import ShiftOpenModal from '../components/shifts/ShiftOpenModal.vue'
 import ShiftCloseModal from '../components/shifts/ShiftCloseModal.vue'
 import ShiftPrintModal from '../components/shifts/ShiftPrintModal.vue'
 import { useShifts, DENOMINATIONS } from '../stores/shifts'
-import { useAuth } from '../stores/auth'
+import { useAuth, INVOICE_VIEW_PERMS } from '../stores/auth'
 import { useSettings } from '../stores/settings'
 import { money, number, fmtDateTime, fmtTime, fmtDate, dateKey } from '../utils/format'
 
@@ -45,7 +45,7 @@ const duration = (s) => {
     <div class="page-header">
       <div><h1>Ca làm việc</h1><p>Mở ca, chốt két và đối soát tiền mặt cuối ca</p></div>
       <div class="spacer"></div>
-      <button v-if="auth.can('shifts.viewAll')" class="btn btn--ghost" @click="dayPrint = dateKey()"><Icon name="print" :size="15" />Tổng kết hôm nay</button>
+      <button v-if="auth.can(['shifts.viewAll', ...INVOICE_VIEW_PERMS])" class="btn btn--ghost" @click="dayPrint = dateKey()"><Icon name="print" :size="15" />Tổng kết hôm nay</button>
       <button v-if="!cur" class="btn btn--primary" @click="showOpen = true"><Icon name="fa-lock-open" :size="15" />Mở ca</button>
       <button v-else class="btn btn--primary" @click="showClose = true"><Icon name="fa-lock" :size="15" />Đóng ca {{ cur.code }}</button>
     </div>

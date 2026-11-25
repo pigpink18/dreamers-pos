@@ -6,7 +6,7 @@ import Icon from '../ui/Icon.vue'
 import ShiftPrintModal from './ShiftPrintModal.vue'
 import { useShifts, DENOMINATIONS } from '../../stores/shifts'
 import { useUi } from '../../stores/ui'
-import { useAuth } from '../../stores/auth'
+import { useAuth, INVOICE_VIEW_PERMS } from '../../stores/auth'
 import { money, number, fmtDateTime, dateKey } from '../../utils/format'
 import MoneyInput from '../ui/MoneyInput.vue'
 
@@ -14,7 +14,7 @@ const emit = defineEmits(['close', 'closed'])
 const shifts = useShifts()
 const ui = useUi()
 // Tổng kết ngày gồm doanh thu của mọi bộ phận -> chỉ người xem được mọi ca (chủ quán, quản lý)
-const canDay = useAuth().can('shifts.viewAll')
+const canDay = useAuth().can(['shifts.viewAll', ...INVOICE_VIEW_PERMS])
 const s = shifts.current
 const sum = computed(() => shifts.summary(s))
 

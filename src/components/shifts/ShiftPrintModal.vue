@@ -7,7 +7,7 @@ import Icon from '../ui/Icon.vue'
 import ShiftReceipt from './ShiftReceipt.vue'
 import DailyReceipt from './DailyReceipt.vue'
 import { dateKey, fmtDate } from '../../utils/format'
-import { useAuth } from '../../stores/auth'
+import { useAuth, INVOICE_VIEW_PERMS } from '../../stores/auth'
 
 const props = defineProps({
   shift: { type: Object, default: null },  // null = chỉ in tổng ngày
@@ -16,8 +16,8 @@ const props = defineProps({
   title: { type: String, default: '' },
 })
 const emit = defineEmits(['close'])
-// Tổng kết ngày gồm doanh thu mọi bộ phận -> chỉ chủ quán / quản lý (quyền xem mọi ca)
-const canDay = useAuth().can('shifts.viewAll')
+// Tổng kết ngày: chủ quán / quản lý thấy cả quán; nhân viên xem được hoá đơn bộ phận nào thì thấy phần đó
+const canDay = useAuth().can(['shifts.viewAll', ...INVOICE_VIEW_PERMS])
 const view = ref(props.shift && (props.tab === 'shift' || !canDay) ? 'shift' : 'day')
 const day = computed(() => props.date || (props.shift ? dateKey(props.shift.openedAt) : dateKey()))
 const print = () => printReceipt()
